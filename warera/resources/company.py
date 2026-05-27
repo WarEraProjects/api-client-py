@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import typing
 from collections.abc import AsyncIterator
 from datetime import datetime
@@ -243,7 +242,7 @@ class CompanyResource(BaseResource):
         if not company_ids:
             return []
             
-        all_companies = []
+        all_companies: list[Company | None] = []
         batch = BatchSession(self._http, concurrency=concurrency)
         items = []
         for cid in company_ids:

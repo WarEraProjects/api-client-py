@@ -169,7 +169,7 @@ class UserResource(BaseResource):
         if not user_ids:
             return []
             
-        all_users = []
+        all_users: list[User | None] = []
         batch = BatchSession(self._http, concurrency=concurrency)
         items = []
         for uid in user_ids:

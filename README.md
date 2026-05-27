@@ -676,7 +676,7 @@ except WareraError as e:
 WareraClient(
     api_key: str | None = None,        # also reads WARERA_API_KEY env var
     base_url: str = "https://api2.warera.io/trpc",
-    timeout: float = 10.0,             # HTTP request timeout in seconds
+    timeout: float = 30.0,             # HTTP request timeout in seconds
     max_retries: int = 3,              # retry attempts for 429 / 5xx errors
     retry_backoff_factor: float = 0.5, # exponential backoff multiplier
     batch_size: int = 50,              # max procedures per batch POST chunk

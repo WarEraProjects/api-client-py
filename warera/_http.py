@@ -449,10 +449,7 @@ class HttpSession:
                 self._rate_limit.update(resp.headers)
                 self._rate_limit.record_request(num_procedures=len(body))
                 self._check_response(resp)
-                if _orjson is not None:
-                    data = _orjson.loads(resp.content)
-                else:
-                    data = resp.json()
+                data = _orjson.loads(resp.content) if _orjson is not None else resp.json()
                 if not isinstance(data, list):
                     raise ValueError(
                         f"Expected list from batch endpoint, got {type(data).__name__}"
