@@ -30,12 +30,8 @@ import time
 from typing import Any
 from urllib.parse import quote
 
-try:
-    import orjson as _orjson  # ~5-10× faster JSON serialization
-except ImportError:
-    _orjson = None  # type: ignore[assignment,unused-ignore]
-
 import httpx
+import orjson as _orjson  # ~5-10× faster JSON serialization
 from tenacity import (
     AsyncRetrying,
     retry_if_exception,

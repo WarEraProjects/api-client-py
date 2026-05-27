@@ -30,6 +30,7 @@ class PartyResource(BaseResource):
         cursor: str | None = None,
         direction: str | None = None,
         auto_paginate: typing.Literal[False] = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> CursorPage[Party]: ...
@@ -43,6 +44,7 @@ class PartyResource(BaseResource):
         cursor: str | None = None,
         direction: str | None = None,
         auto_paginate: typing.Literal[True],
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> AsyncIterator[CursorPage[Party]]: ...
@@ -55,9 +57,10 @@ class PartyResource(BaseResource):
         cursor: str | None = None,
         direction: str | None = None,
         auto_paginate: bool = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Party] | AsyncIterator[CursorPage[Party]]:
+    ) -> CursorPage[Party] | AsyncIterator[CursorPage[Party]] | AsyncIterator[Party]:
         """
         Get political parties (cursor-paginated), optionally filtered by country.
 
@@ -65,6 +68,22 @@ class PartyResource(BaseResource):
             country_id: Filter to parties in this country.
             direction:  ``"forward"`` (default) or ``"backward"`` pagination.
         """
+        if auto_items:
+            from .._pagination import auto_paginate_items
+            return auto_paginate_items(
+                self.get_paginated,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                **{k: v for k, v in locals().items() if k not in ("self", "auto_paginate", "auto_items", "max_pages", "cursor_end", "kwargs")}
+            )
+        if auto_items:
+            from .._pagination import auto_paginate_items
+            return auto_paginate_items(
+                self.get_paginated,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                **{k: v for k, v in locals().items() if k not in ("self", "auto_paginate", "auto_items", "max_pages", "cursor_end", "kwargs")}
+            )
         if auto_paginate:
             return auto_paginate_pages(
                 self.get_paginated,
@@ -105,6 +124,10 @@ class PartyResource(BaseResource):
 
     async def collect_all(self, **kwargs: typing.Any) -> list[Party]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
+        import warnings
+        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
+        import warnings
+        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
         from .._pagination import parallel_collect_all
         fetch_fn = getattr(self, "get_paginated", None) or getattr(self, "get_many", None) or getattr(self, "get_all", None)
         if fetch_fn is None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import warnings
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime, timedelta, timezone
 from typing import Any, TypeVar
@@ -64,6 +65,12 @@ async def auto_paginate_pages(
         cursor_end: Cutoff date. Stops when the next_cursor is older than this.
         **kwargs:   Extra arguments forwarded to the fetch_fn.
     """
+    warnings.warn(
+        "`auto_paginate=True` is deprecated and will be removed in v0.3.0. "
+        "Use `auto_items=True` instead to stream items directly.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if isinstance(cursor_end, str):
         cursor_end = cursor_end.replace("Z", "+00:00")
         cursor_end = datetime.fromisoformat(cursor_end)
@@ -91,6 +98,24 @@ async def auto_paginate_pages(
 
 
 
+
+async def auto_paginate_items(
+    fetch_fn: PageFetcher[T],
+    max_pages: int | float = float("inf"),
+    cursor_end: datetime | str | None = None,
+    **kwargs: Any,
+) -> AsyncGenerator[T, None]:
+    """
+    Async generator that fetches pages transparently and yields individual items directly.
+    """
+    # Temporarily suppress the deprecation warning since this is an internal call
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        async for page in auto_paginate_pages(
+            fetch_fn, max_pages=max_pages, cursor_end=cursor_end, **kwargs
+        ):
+            for item in page.items:
+                yield item
 
 WARERA_EPOCH = datetime(2025, 1, 1, tzinfo=timezone.utc)
 
@@ -185,6 +210,11 @@ async def paginate_items(
     """
     A simple wrapper to seamlessly yield individual items from an auto-paginating endpoint.
     """
+    warnings.warn(
+        "`paginate()` wrapper is deprecated. Use `get_paginated(auto_items=True)` directly.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     kwargs["auto_paginate"] = True
     result = await fetch_fn(**kwargs)
     if hasattr(result, "__aiter__"):

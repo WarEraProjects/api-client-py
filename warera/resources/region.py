@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .._cache import async_memoize
 from ..models.region import Region
 from ._base import BaseResource
 
@@ -16,10 +17,10 @@ class RegionResource(BaseResource):
         raw = await self._get("region.getById", regionId=region_id)
         return Region.model_validate(raw)
 
+    @async_memoize
     async def get_all(self) -> dict[str, Region]:
         """
         Get all regions as a dict keyed by region ID.
-        This is a large payload — cache it if you call it repeatedly.
         """
         raw = await self._get("region.getRegionsObject")
         if isinstance(raw, dict):

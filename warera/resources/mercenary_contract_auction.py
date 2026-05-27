@@ -25,6 +25,7 @@ class MercenaryContractAuctionResource(BaseResource):
         limit: int = 10,
         cursor: str | None = None,
         auto_paginate: typing.Literal[False] = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> CursorPage[MercenaryContractAuction]: ...
@@ -39,6 +40,7 @@ class MercenaryContractAuctionResource(BaseResource):
         limit: int = 10,
         cursor: str | None = None,
         auto_paginate: typing.Literal[True],
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> AsyncIterator[CursorPage[MercenaryContractAuction]]: ...
@@ -52,9 +54,10 @@ class MercenaryContractAuctionResource(BaseResource):
         limit: int = 10,
         cursor: str | None = None,
         auto_paginate: bool = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[MercenaryContractAuction] | AsyncIterator[CursorPage[MercenaryContractAuction]]:
+    ) -> CursorPage[MercenaryContractAuction] | AsyncIterator[CursorPage[MercenaryContractAuction]] | AsyncIterator[MercenaryContractAuction]:
         """
         Get mercenary contract auctions (cursor-paginated).
         """
@@ -93,6 +96,10 @@ class MercenaryContractAuctionResource(BaseResource):
 
     async def collect_all(self, **kwargs: typing.Any) -> list[MercenaryContractAuction]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
+        import warnings
+        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
+        import warnings
+        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
         from .._pagination import parallel_collect_all
         fetch_fn = getattr(self, "get_paginated", None) or getattr(self, "get_many", None) or getattr(self, "get_all", None)
         if fetch_fn is None:

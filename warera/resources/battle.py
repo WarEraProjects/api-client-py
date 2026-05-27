@@ -51,6 +51,7 @@ class BattleResource(BaseResource):
         war_id: str | None = None,
         country_id: str | None = None,
         auto_paginate: typing.Literal[False] = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> CursorPage[Battle]: ...
@@ -68,6 +69,7 @@ class BattleResource(BaseResource):
         war_id: str | None = None,
         country_id: str | None = None,
         auto_paginate: typing.Literal[True],
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> AsyncIterator[CursorPage[Battle]]: ...
@@ -84,9 +86,10 @@ class BattleResource(BaseResource):
         war_id: str | None = None,
         country_id: str | None = None,
         auto_paginate: bool = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Battle] | AsyncIterator[CursorPage[Battle]]:
+    ) -> CursorPage[Battle] | AsyncIterator[CursorPage[Battle]] | AsyncIterator[Battle]:
         """Get battles with optional filters (cursor-paginated)."""
         if auto_paginate:
             return auto_paginate_pages(
@@ -136,6 +139,10 @@ class BattleResource(BaseResource):
 
     async def collect_all(self, **kwargs: typing.Any) -> list[Battle]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
+        import warnings
+        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
+        import warnings
+        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
         from .._pagination import parallel_collect_all
         fetch_fn = getattr(self, "get_paginated", None) or getattr(self, "get_many", None) or getattr(self, "get_all", None)
         if fetch_fn is None:
