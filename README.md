@@ -681,6 +681,11 @@ WareraClient(
                                        # values above 50 are silently clamped
                                        # to the server's hard limit
 )
+
+# You can also configure the extreme maximum concurrency for massive bulk fetching operations 
+# (defaults to 500 to perfectly match the API rate limit). Dial this down to 50 or 100 if you
+# are running in constrained environments to save memory.
+# export WARERA_MAX_CONCURRENCY=50
 ```
 
 ---

@@ -26,6 +26,7 @@ import asyncio
 import contextlib
 import json
 import os
+import random
 import time
 from typing import Any
 from urllib.parse import quote
@@ -180,8 +181,9 @@ class _RateLimitState:
             if self.remaining is not None and self.remaining <= 0 and self._reset_at is not None:
                 wait_secs = self._reset_at - time.monotonic()
                 if wait_secs > 0:
-                    self.total_wait_seconds += wait_secs
-                    await asyncio.sleep(wait_secs)
+                    jitter = random.uniform(0.01, 0.5)
+                    self.total_wait_seconds += wait_secs + jitter
+                    await asyncio.sleep(wait_secs + jitter)
                 # Reset state — next response will give us fresh values.
                 self.remaining = None
                 self._prev_remaining = None
@@ -235,7 +237,7 @@ class HttpSession:
                 timeout=self._timeout,
                 headers={"User-Agent": "warera-client"},
                 follow_redirects=True,
-                limits=httpx.Limits(max_connections=500, max_keepalive_connections=500),
+                limits=httpx.Limits(max_connections=200, max_keepalive_connections=50),
             )
         # Ensure the rate-limit lock is created inside the running event loop.
         # This is safe to call repeatedly — it is a no-op after the first call.

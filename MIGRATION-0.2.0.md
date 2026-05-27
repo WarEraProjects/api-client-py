@@ -63,6 +63,10 @@ async for party in client.party.get_paginated(country_id="7", auto_items=True):
 all_parties = await client.party.collect_all(country_id="7")
 ```
 
+> [!WARNING]
+> **Extreme Throughput Caution**: The `collect_all` and `get_many` engines default to an extreme concurrency of 500 to perfectly saturate the 500 req/min API rate limit. While the client safely protects against 429 errors and DDoS mitigation logic by jittering bursts, this concurrency can cause high memory usage on constrained environments (like AWS Lambdas) or hit OS File Descriptor limits if used concurrently with other network apps.
+> You can globally dial down the concurrency limit by setting the `WARERA_MAX_CONCURRENCY` environment variable (e.g. `export WARERA_MAX_CONCURRENCY=50`).
+
 ## 4. Static Resources Caching
 
 Static resources like `warera.game_config.get()` or `warera.country.find_by_name()` are now aggressively cached in-memory concurrently. You don't need to wrap these calls in your own cache loops anymore; the SDK does it for you.

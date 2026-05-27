@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import warnings
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime, timedelta, timezone
@@ -118,12 +119,13 @@ async def auto_paginate_items(
                 yield item
 
 WARERA_EPOCH = datetime(2025, 1, 1, tzinfo=timezone.utc)
+WARERA_MAX_CONCURRENCY = int(os.environ.get("WARERA_MAX_CONCURRENCY", 500))
 
 async def parallel_collect_all(
     fetch_fn: Callable[..., Coroutine[Any, Any, CursorPage[T] | AsyncGenerator[CursorPage[T], None]]],
     oldest_date: datetime | str | None = None,
     time_slice_days: int = 30,
-    concurrency: int = 500,
+    concurrency: int | None = None,
     **kwargs: Any,
 ) -> list[T]:
     """
@@ -151,11 +153,19 @@ async def parallel_collect_all(
         chunks.append((cursor, chunk_start))
         current_end = chunk_start
 
+    concurrency = concurrency or WARERA_MAX_CONCURRENCY
     sem = asyncio.Semaphore(concurrency)
+    abort_event = asyncio.Event()
 
     async def fetch_chunk(cur: str | None, cur_end: datetime) -> list[T]:
+        if abort_event.is_set():
+            return []
+            
         chunk_items: list[T] = []
         async with sem:
+            if abort_event.is_set():
+                return []
+                
             result = await fetch_fn(
                 auto_paginate=True,
                 cursor=cur,
@@ -166,10 +176,14 @@ async def parallel_collect_all(
             if hasattr(result, "__aiter__"):
                 async for page in result:
                     chunk_items.extend(page.items)
+                    if not getattr(page, "has_more", True):
+                        abort_event.set()
             else:
                 # Actually, auto_paginate=True should always return AsyncGenerator,
                 # but if it somehow returns CursorPage, we just handle it.
                 chunk_items.extend(result.items)
+                if not getattr(result, "has_more", True):
+                    abort_event.set()
         return chunk_items
 
     chunk_results = await asyncio.gather(*[
