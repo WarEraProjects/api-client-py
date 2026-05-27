@@ -30,6 +30,7 @@ class TransactionResource(BaseResource):
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
         auto_paginate: typing.Literal[False] = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> CursorPage[Transaction]: ...
@@ -47,6 +48,7 @@ class TransactionResource(BaseResource):
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
         auto_paginate: typing.Literal[True],
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> AsyncIterator[CursorPage[Transaction]]: ...
@@ -63,15 +65,31 @@ class TransactionResource(BaseResource):
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
         auto_paginate: bool = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Transaction] | AsyncIterator[CursorPage[Transaction]]:
+    ) -> CursorPage[Transaction] | AsyncIterator[CursorPage[Transaction]] | AsyncIterator[Transaction]:
         """
         Get paginated transactions with optional filters.
 
         `transaction_type` uniquely accepts a single type string OR a list — both are
         valid per the API schema. When a list is passed it is serialised as-is.
         """
+        if auto_items:
+            from .._pagination import auto_paginate_items
+            return auto_paginate_items(
+                self.get_paginated,
+                max_pages=max_pages,
+                cursor=cursor,
+                cursor_end=cursor_end,
+                limit=limit,
+                user_id=user_id,
+                mu_id=mu_id,
+                country_id=country_id,
+                party_id=party_id,
+                item_code=item_code,
+                transaction_type=transaction_type,
+            )
         if auto_paginate:
             return auto_paginate_pages(
                 self.get_paginated,
@@ -112,7 +130,7 @@ class TransactionResource(BaseResource):
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
         time_slice_days: int = 30,
-        concurrency: int = 20,
+        concurrency: int = 500,
     ) -> list[Transaction]:
         """
         Fetch all transactions back to `oldest_date` using parallel time-slicing.

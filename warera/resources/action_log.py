@@ -74,6 +74,22 @@ class ActionLogResource(BaseResource):
             country_id:  Filter by country ID.
             action_type: Filter by action type.
         """
+        if auto_items:
+
+            from .._pagination import auto_paginate_items
+
+            return auto_paginate_items(
+                self.get_many,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                limit=limit,
+                user_id=user_id,
+                mu_id=mu_id,
+                country_id=country_id,
+                action_type=action_type,
+
+            )
+
         if auto_paginate:
             return auto_paginate_pages(
                 self.get_many,
@@ -131,6 +147,6 @@ class ActionLogResource(BaseResource):
             fetch_fn,
             oldest_date=kwargs.pop("oldest_date", None),
             time_slice_days=kwargs.pop("time_slice_days", 30),
-            concurrency=kwargs.pop("concurrency", 10),
+            concurrency=kwargs.pop("concurrency", 500),
             **kwargs,
         )

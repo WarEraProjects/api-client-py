@@ -106,6 +106,7 @@ class CompanyResource(BaseResource):
         per_page: int = 10,
         cursor: str | None = None,
         auto_paginate: typing.Literal[False] = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> CursorPage[Company]: ...
@@ -118,6 +119,7 @@ class CompanyResource(BaseResource):
         per_page: int = 10,
         cursor: str | None = None,
         auto_paginate: typing.Literal[True],
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> AsyncIterator[CursorPage[Company]]: ...
@@ -129,10 +131,21 @@ class CompanyResource(BaseResource):
         per_page: int = 10,
         cursor: str | None = None,
         auto_paginate: bool = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Company] | AsyncIterator[CursorPage[Company]]:
+    ) -> CursorPage[Company] | AsyncIterator[CursorPage[Company]] | AsyncIterator[Company]:
         """Get companies, optionally filtered by owner user ID (cursor-paginated)."""
+        if auto_items:
+            from .._pagination import auto_paginate_items
+            return auto_paginate_items(
+                self.get_companies,
+                max_pages=max_pages,
+                cursor=cursor,
+                cursor_end=cursor_end,
+                user_id=user_id,
+                per_page=per_page,
+            )
         if auto_paginate:
             return auto_paginate_pages(
                 self.get_companies,
@@ -162,7 +175,7 @@ class CompanyResource(BaseResource):
         self,
         oldest_date: datetime | str | None = None,
         time_slice_days: int = 30,
-        concurrency: int = 10,
+        concurrency: int = 500,
         **kwargs: Any
     ) -> list[Company]:
         """
@@ -224,18 +237,33 @@ class CompanyResource(BaseResource):
     # Batch helpers
     # ------------------------------------------------------------------
 
-    async def get_many(self, company_ids: list[str]) -> list[Company | None]:
+    async def get_many(self, company_ids: list[str], *, concurrency: int = 500) -> list[Company | None]:
         """Fetch multiple companies by ID concurrently using the auto-batcher."""
+        from .._batch import BatchSession
+        if not company_ids:
+            return []
+            
+        all_companies = []
+        batch = BatchSession(self._http, concurrency=concurrency)
+        items = []
+        for cid in company_ids:
+            items.append(batch.add("company.getById", {"companyId": cid}))
+            
+        await batch.flush()
         
-        futs = [self.get(cid) for cid in company_ids]
-        results = await asyncio.gather(*futs, return_exceptions=True)
-        return [r if not isinstance(r, BaseException) else None for r in results]
+        for item in items:
+            if item.ok and item.result:
+                all_companies.append(Company.model_validate(item.result))
+            else:
+                all_companies.append(None)
+                
+        return all_companies
 
     async def collect_by_users(
         self,
         user_ids: list[str],
         *,
-        concurrency: int = 20,
+        concurrency: int = 500,
     ) -> list[Company]:
         """
         Fetch all companies owned by a list of users.

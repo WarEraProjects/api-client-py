@@ -91,6 +91,21 @@ class BattleResource(BaseResource):
         cursor_end: str | None = None,
     ) -> CursorPage[Battle] | AsyncIterator[CursorPage[Battle]] | AsyncIterator[Battle]:
         """Get battles with optional filters (cursor-paginated)."""
+        if auto_items:
+            from .._pagination import auto_paginate_items
+            return auto_paginate_items(
+                self.get_many,
+                max_pages=max_pages,
+                cursor=cursor,
+                cursor_end=cursor_end,
+                is_active=is_active,
+                limit=limit,
+                direction=direction,
+                filter=filter,
+                defender_region_id=defender_region_id,
+                war_id=war_id,
+                country_id=country_id,
+            )
         if auto_paginate:
             return auto_paginate_pages(
                 self.get_many,
@@ -152,6 +167,6 @@ class BattleResource(BaseResource):
             fetch_fn,
             oldest_date=kwargs.pop("oldest_date", None),
             time_slice_days=kwargs.pop("time_slice_days", 30),
-            concurrency=kwargs.pop("concurrency", 10),
+            concurrency=kwargs.pop("concurrency", 500),
             **kwargs,
         )

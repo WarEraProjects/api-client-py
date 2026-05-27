@@ -61,6 +61,21 @@ class MercenaryContractAuctionResource(BaseResource):
         """
         Get mercenary contract auctions (cursor-paginated).
         """
+        if auto_items:
+
+            from .._pagination import auto_paginate_items
+
+            return auto_paginate_items(
+                self.get_paginated_auctions,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                country_id=country_id,
+                battle_id=battle_id,
+                status=status,
+                limit=limit,
+
+            )
+
         if auto_paginate:
             return auto_paginate_pages(
                 self.get_paginated_auctions,
@@ -109,6 +124,6 @@ class MercenaryContractAuctionResource(BaseResource):
             fetch_fn,
             oldest_date=kwargs.pop("oldest_date", None),
             time_slice_days=kwargs.pop("time_slice_days", 30),
-            concurrency=kwargs.pop("concurrency", 10),
+            concurrency=kwargs.pop("concurrency", 500),
             **kwargs,
         )

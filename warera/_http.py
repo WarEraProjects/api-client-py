@@ -235,7 +235,7 @@ class HttpSession:
                 timeout=self._timeout,
                 headers={"User-Agent": "warera-client"},
                 follow_redirects=True,
-                limits=httpx.Limits(max_connections=200, max_keepalive_connections=50),
+                limits=httpx.Limits(max_connections=500, max_keepalive_connections=500),
             )
         # Ensure the rate-limit lock is created inside the running event loop.
         # This is safe to call repeatedly — it is a no-op after the first call.

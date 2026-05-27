@@ -39,6 +39,7 @@ class UserResource(BaseResource):
         limit: int = 10,
         cursor: str | None = None,
         auto_paginate: typing.Literal[False] = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> CursorPage[UserLite]: ...
@@ -51,6 +52,7 @@ class UserResource(BaseResource):
         limit: int = 10,
         cursor: str | None = None,
         auto_paginate: typing.Literal[True],
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
     ) -> AsyncIterator[CursorPage[UserLite]]: ...
@@ -62,10 +64,21 @@ class UserResource(BaseResource):
         limit: int = 10,
         cursor: str | None = None,
         auto_paginate: bool = False,
+        auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[UserLite] | AsyncIterator[CursorPage[UserLite]]:
+    ) -> CursorPage[UserLite] | AsyncIterator[CursorPage[UserLite]] | AsyncIterator[UserLite]:
         """Get users belonging to a country (cursor-paginated)."""
+        if auto_items:
+            from .._pagination import auto_paginate_items
+            return auto_paginate_items(
+                self.get_by_country,
+                max_pages=max_pages,
+                cursor=cursor,
+                cursor_end=cursor_end,
+                country_id=country_id,
+                limit=limit,
+            )
         if auto_paginate:
             return auto_paginate_pages(
                 self.get_by_country,
@@ -89,7 +102,7 @@ class UserResource(BaseResource):
         country_id: str, 
         oldest_date: datetime | str | None = None,
         time_slice_days: int = 30,
-        concurrency: int = 10,
+        concurrency: int = 500,
         **kwargs: Any
     ) -> list[UserLite]:
         """Return all users in a country as a flat list, fetched in parallel."""
@@ -103,7 +116,7 @@ class UserResource(BaseResource):
             **kwargs,
         )
 
-    async def collect_all(self, *, concurrency: int = 20) -> list[UserLite]:
+    async def collect_all(self, *, concurrency: int = 500) -> list[UserLite]:
         """
         Fetch every user from every country concurrently using auto pagination.
 
@@ -132,7 +145,7 @@ class UserResource(BaseResource):
             async with sem:
                 # We use collect_by_country, but set its concurrency low to not exhaust the semaphore
                 # since we're already scaling concurrency horizontally across countries.
-                return await self.collect_by_country(country_id=cid, limit=100, concurrency=2)
+                return await self.collect_by_country(country_id=cid, limit=100, concurrency=500)
 
         results = await asyncio.gather(*[fetch_for_country(cid) for cid in country_ids])
         
@@ -150,11 +163,24 @@ class UserResource(BaseResource):
     # Batch helper
     # ------------------------------------------------------------------
 
-    async def get_many(self, user_ids: list[str]) -> list[User | None]:
+    async def get_many(self, user_ids: list[str], *, concurrency: int = 500) -> list[User | None]:
         """Fetch multiple users by ID concurrently using the auto-batcher."""
-        import asyncio
-
+        from .._batch import BatchSession
+        if not user_ids:
+            return []
+            
+        all_users = []
+        batch = BatchSession(self._http, concurrency=concurrency)
+        items = []
+        for uid in user_ids:
+            items.append(batch.add("user.getUserById", {"userId": uid}))
+            
+        await batch.flush()
         
-        futs = [self.get_by_id(uid) for uid in user_ids]
-        results = await asyncio.gather(*futs, return_exceptions=True)
-        return [r if not isinstance(r, BaseException) else None for r in results]
+        for item in items:
+            if item.ok and item.result:
+                all_users.append(User.model_validate(item.result))
+            else:
+                all_users.append(None)
+                
+        return all_users

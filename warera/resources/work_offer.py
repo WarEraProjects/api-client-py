@@ -228,6 +228,6 @@ class WorkOfferResource(BaseResource):
             fetch_fn,
             oldest_date=kwargs.pop("oldest_date", None),
             time_slice_days=kwargs.pop("time_slice_days", 30),
-            concurrency=kwargs.pop("concurrency", 10),
+            concurrency=kwargs.pop("concurrency", 500),
             **kwargs,
         )

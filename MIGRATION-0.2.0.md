@@ -1,6 +1,6 @@
 # Migrating to warera-client v0.2.0
 
-Version `0.2.0` introduces a completely modernized Developer Experience (DX) focused on implicit performance and simpler syntax. We've introduced a global API module, transparent auto-batching, and smart caching.
+Version `0.2.0` introduces a modernized Developer Experience (DX) focused on implicit performance and simpler syntax. We've introduced a global API module, a supercharged time-slicing pagination engine, and smart caching.
 
 Here is what you need to know to upgrade your code from `0.1.x`.
 
@@ -31,31 +31,32 @@ If you need to set an API key dynamically, you can use `warera.set_api_key("..."
 
 *(Note: The old `WareraClient` context manager still exists and is fully supported if you prefer the classic approach).*
 
-## 2. Transparent Auto-Batching
+## 2. Smart Auto-Batching in `get_many()`
 
-The `get_many()` methods on all resources (e.g., `user.get_many()`, `company.get_many()`) have been drastically simplified. You no longer need to pass `batch_size`. The client automatically batches and chunks your requests globally in a 10ms window.
+The `get_many()` methods on all resources (e.g., `user.get_many()`, `company.get_many()`) have been updated. They now use the `BatchSession` engine internally to split huge lists of IDs into compliant chunks of 50 procedures, fetching them all concurrently over the network. 
 
 **Before:**
 ```python
-users = await client.user.get_many(["1", "2", "3"], batch_size=50)
+users = await client.user.get_many(["1", "2", "3", ...], batch_size=50)
 ```
 
 **After:**
 ```python
-users = await warera.user.get_many(["1", "2", "3"])
+# Pass 10,000 IDs if you want, it will automatically chunk and fire concurrently.
+users = await warera.user.get_many(["1", "2", "3", ...])
 ```
 
 ## 3. Supercharged Pagination
 
-In `0.1.x`, `paginate()` and `collect_all()` were somewhat bloated sequential generators. In `0.2.0`, these wrappers have been **restored and massively supercharged** across all paginated resources!
+In `0.1.x`, we relied heavily on generator loops. In `0.2.0`, pagination has been modernized:
 
-- **`paginate()`**: Still an async generator, but now perfectly proxies the underlying API engine transparently.
+- **`auto_items=True`**: To yield single items across pages, simply pass `auto_items=True` to any paginated method. This replaces the old `paginate()` wrapper.
 - **`collect_all()`**: Completely rewritten. It now uses a **parallel time-slicing engine** with synthetic cursors. Instead of fetching pages sequentially, it splits the history into chunks and fetches them all concurrently, resulting in a >5x speedup for massive datasets!
 
 **Usage:**
 ```python
 # Async item generator
-async for party in client.party.paginate(country_id="7"):
+async for party in client.party.get_paginated(country_id="7", auto_items=True):
     print(party.name)
 
 # Collect all items instantly in parallel

@@ -123,7 +123,7 @@ async def parallel_collect_all(
     fetch_fn: Callable[..., Coroutine[Any, Any, CursorPage[T] | AsyncGenerator[CursorPage[T], None]]],
     oldest_date: datetime | str | None = None,
     time_slice_days: int = 30,
-    concurrency: int = 20,
+    concurrency: int = 500,
     **kwargs: Any,
 ) -> list[T]:
     """

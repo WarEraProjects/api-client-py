@@ -22,7 +22,7 @@ async def main():
 - **Full API coverage** — all endpoints across 32 resource namespaces.
 - **Fully Typed** — Pydantic v2 models for *every* request and response.
 - **Async-first** — built on `httpx.AsyncClient`; sync shim included.
-- **Cursor pagination** — transparent `paginate()` generator and `collect_all()` helper.
+- **Cursor pagination** — transparent `auto_items=True` generator and `collect_all()` time-slicing engine.
 - **Batch requests** — `BatchSession` for multiple procedures in one HTTP round-trip; auto-chunked `get_many` for ID lists.
 - **Smart batch splitting** — any batch larger than the server's hard limit of 50 is automatically split and fired concurrently; no manual chunking needed.
 - **Adaptive rate limiting** — reads `ratelimit-remaining` / `ratelimit-reset` response headers and sleeps exactly as long as the server says.
@@ -125,9 +125,9 @@ Each section follows this layout: **method signatures** → **enums** (if any) �
 ```python
 await client.user.get_by_id(user_id: str) -> User
 await client.user.get_by_country(country_id, *, limit=10, cursor=None) -> CursorPage[User]
-await client.user.paginate_by_country(country_id, **kwargs)            # async generator
+await client.user.get_by_country(country_id, *, limit=10, cursor=None, auto_items=True) # async generator
 await client.user.collect_by_country(country_id, **kwargs) -> list[User]
-await client.user.get_many(user_ids: list[str], batch_size=50) -> list[User]
+await client.user.get_many(user_ids: list[str]) -> list[User]
 ```
 
 ### `client.company`
@@ -136,8 +136,8 @@ await client.user.get_many(user_ids: list[str], batch_size=50) -> list[User]
 await client.company.get(company_id: str) -> Company
 await client.company.get_companies(*, user_id=None, per_page=10, cursor=None) -> CursorPage[Company]
 await client.company.get_by_user(user_id, **kwargs) -> list[Company]
-await client.company.paginate(**kwargs)                                 # async generator
-await client.company.get_many(company_ids: list[str], batch_size=50) -> list[Company]
+await client.company.get_companies(auto_items=True, **kwargs)                           # async generator
+await client.company.get_many(company_ids: list[str]) -> list[Company]
 await client.company.get_recommended_regions(item_code, *, include_deposit=True) -> list[RecommendedRegion]
 await client.company.get_production_bonus(company_id: str) -> CompanyProductionBonus
 ```
@@ -181,7 +181,7 @@ await client.party.get(party_id: str) -> Party
 await client.party.get_paginated(*, country_id=None, limit=20, cursor=None, direction=None) -> CursorPage[Party]
 await client.party.get_by_country(country_id: str) -> list[Party]
 await client.party.collect_all(**kwargs) -> list[Party]
-await client.party.paginate(**kwargs)                              # async generator
+await client.party.get_paginated(auto_items=True, **kwargs)                        # async generator
 ```
 
 <details><summary><b><code>Party</code></b> fields</summary>
@@ -205,7 +205,7 @@ await client.donation.get_paginated(*, mu_id=None, country_id=None, party_id=Non
     limit=20, cursor=None, direction=None) -> CursorPage[Donation]
 await client.donation.get_totals(*, mu_id=None, country_id=None, party_id=None) -> DonationTotals
 await client.donation.collect_all(**kwargs) -> list[Donation]
-await client.donation.paginate(**kwargs)                           # async generator
+await client.donation.get_paginated(auto_items=True, **kwargs)                     # async generator
 ```
 
 <details><summary><b><code>DonationTotals</code></b> fields</summary>
@@ -223,7 +223,7 @@ print(f"{totals.donor_count} donors, {totals.total_amount} total")
 await client.election.get_paginated(*, country_id=None, limit=20, cursor=None, direction=None) -> CursorPage[Election]
 await client.election.get_by_country(country_id: str) -> list[Election]
 await client.election.collect_all(**kwargs) -> list[Election]
-await client.election.paginate(**kwargs)                           # async generator
+await client.election.get_paginated(auto_items=True, **kwargs)                     # async generator
 ```
 
 <details><summary><b><code>Election</code></b> fields</summary>
@@ -307,7 +307,7 @@ await client.battle.get_live(battle_id, *, round_number=None) -> BattleLive
 await client.battle.get_many(*, is_active=None, limit=10, cursor=None, direction=None,
     filter=None, defender_region_id=None, war_id=None, country_id=None) -> CursorPage[Battle]
 await client.battle.get_active(**kwargs) -> list[Battle]
-await client.battle.paginate(**kwargs)                             # async generator
+await client.battle.get_many(auto_items=True, **kwargs)                            # async generator
 ```
 
 `BattleFilter` - `ALL` `YOUR_COUNTRY` `YOUR_ENEMIES`
@@ -352,7 +352,7 @@ await client.round.get_many(round_ids: list[str], batch_size=50) -> list[Round]
 ```python
 await client.event.get_paginated(*, limit=10, cursor=None,
     country_id=None, event_types=None) -> CursorPage[Event]
-await client.event.paginate(**kwargs)                              # async generator
+await client.event.get_paginated(auto_items=True, **kwargs)                          # async generator
 await client.event.collect_all(**kwargs) -> list[Event]
 ```
 
@@ -394,7 +394,7 @@ await client.work_offer.get(work_offer_id: str) -> WorkOffer
 await client.work_offer.get_by_company(company_id: str) -> list[WorkOffer]
 await client.work_offer.get_paginated(*, limit=10, cursor=None, user_id=None,
     region_id=None, energy=None, production=None, citizenship=None) -> CursorPage[WorkOffer]
-await client.work_offer.paginate(**kwargs)                         # async generator
+await client.work_offer.get_paginated(auto_items=True, **kwargs)                     # async generator
 await client.work_offer.collect_all(**kwargs) -> list[WorkOffer]
 await client.work_offer.get_wage_stats(*, energy, production, citizenship) -> WageStats
 ```
@@ -426,7 +426,7 @@ await client.worker.get_total_count(user_id: str) -> int
 await client.mu.get(mu_id: str) -> MilitaryUnit
 await client.mu.get_paginated(*, limit=20, cursor=None, member_id=None,
     user_id=None, search=None) -> CursorPage[MilitaryUnit]
-await client.mu.paginate(**kwargs)                                 # async generator
+await client.mu.get_paginated(auto_items=True, **kwargs)                             # async generator
 await client.mu.collect_all(**kwargs) -> list[MilitaryUnit]
 await client.mu.get_many(mu_ids: list[str], batch_size=50) -> list[MilitaryUnit]
 ```
@@ -455,7 +455,7 @@ await client.transaction.get_paginated(*, limit=10, cursor=None,
     item_code=None,
     transaction_type: TransactionType | list[TransactionType] | None = None
 ) -> CursorPage[Transaction]
-await client.transaction.paginate(**kwargs)                        # async generator
+await client.transaction.get_paginated(auto_items=True, **kwargs)                    # async generator
 await client.transaction.collect_all(**kwargs) -> list[Transaction]
 ```
 
@@ -478,7 +478,7 @@ await client.article.get_lite(article_id: str) -> ArticleLite
 await client.article.get_paginated(type: ArticleType, *, limit=10, cursor=None,
     user_id=None, categories=None, languages=None,
     positive_score_only=None) -> CursorPage[ArticleLite]
-await client.article.paginate(type, **kwargs)                      # async generator
+await client.article.get_paginated(type, auto_items=True, **kwargs)                  # async generator
 await client.article.collect_all(type, **kwargs) -> list[ArticleLite]
 ```
 
@@ -512,7 +512,7 @@ await client.action_log.get_many(*, limit=20, cursor=None,
     user_id=None, mu_id=None, country_id=None,
     action_type: ActionLogActionType | None = None
 ) -> CursorPage[ActionLog]
-await client.action_log.paginate(**kwargs)                         # async generator
+await client.action_log.get_many(auto_items=True, **kwargs)                            # async generator
 await client.action_log.get_all(**kwargs) -> list[ActionLog]
 ```
 
@@ -536,7 +536,7 @@ await client.battle_loot_summary.get_by_battle_and_user(battle_id: str, user_id:
 
 ```python
 await client.mercenary_contract_auction.get_paginated_auctions(*, country_id=None, battle_id=None, status=None, limit=10, cursor=None) -> CursorPage[MercenaryContractAuction]
-await client.mercenary_contract_auction.paginate(**kwargs)                         # async generator
+await client.mercenary_contract_auction.get_paginated_auctions(auto_items=True, **kwargs) # async generator
 await client.mercenary_contract_auction.collect_all(**kwargs) -> list[MercenaryContractAuction]
 ```
 
@@ -562,7 +562,7 @@ print(page.next_cursor)  # str | None
 print(page.has_more)     # bool
 
 # 2. Async generator - yields items one by one across all pages
-async for battle in client.battle.paginate(is_active=True):
+async for battle in client.battle.get_many(is_active=True, auto_items=True):
     print(battle.id)
 
 # 3. Collect all pages into a flat list using the ultra-fast parallel time-slicing engine
