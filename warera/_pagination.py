@@ -92,8 +92,6 @@ async def auto_paginate_pages(
 
 
 
-T = TypeVar("T")
-
 WARERA_EPOCH = datetime(2025, 1, 1, tzinfo=timezone.utc)
 
 async def parallel_collect_all(
@@ -141,12 +139,12 @@ async def parallel_collect_all(
             )
             # Support both AsyncGenerator and returning a CursorPage directly
             if hasattr(result, "__aiter__"):
-                async for page in result: # type: ignore
+                async for page in result:
                     chunk_items.extend(page.items)
             else:
                 # Actually, auto_paginate=True should always return AsyncGenerator,
                 # but if it somehow returns CursorPage, we just handle it.
-                chunk_items.extend(result.items) # type: ignore
+                chunk_items.extend(result.items)
         return chunk_items
 
     chunk_results = await asyncio.gather(*[
