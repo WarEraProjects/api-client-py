@@ -24,6 +24,17 @@ def _parse_cursor_date(cursor: str) -> datetime | None:
     if not cursor or "|" not in cursor:
         return None
     date_str = cursor.split("|", 1)[0]
+    
+    # Handle JS Date format: "Wed May 27 2026 05:41:00 GMT+0000 (Coordinated Universal Time)"
+    if "GMT" in date_str:
+        try:
+            from datetime import timezone
+            clean_str = date_str[:24]
+            dt = datetime.strptime(clean_str, "%a %b %d %Y %H:%M:%S")
+            return dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+            
     try:
         # e.g., "2026-05-27T03:04:15Z" -> Python datetime
         date_str = date_str.replace("Z", "+00:00")
@@ -52,7 +63,8 @@ async def auto_paginate_pages(
         cursor_end = cursor_end.replace("Z", "+00:00")
         cursor_end = datetime.fromisoformat(cursor_end)
 
-    cursor: str | None = None
+    # If the user supplied an initial cursor (e.g., from `get_paginated(cursor="foo")`), use it.
+    cursor: str | None = kwargs.pop("cursor", None)
     pages_fetched = 0
 
     while pages_fetched < max_pages:

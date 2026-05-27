@@ -4,7 +4,6 @@ from .common import WareraModel
 
 
 class Transaction(WareraModel):
-    id: str | None = None
     type: str | None = None
     from_id: str | None = None
     to_id: str | None = None

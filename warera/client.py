@@ -187,7 +187,7 @@ class WareraClient:
         await self._http.aclose()
 
     # ------------------------------------------------------------------
-    # Rate-limit introspection
+    # Rate-limit introspection & cumulative stats
     # ------------------------------------------------------------------
 
     @property
@@ -205,6 +205,33 @@ class WareraClient:
         response.  ``None`` if no response has been received yet.
         """
         return self._http._rate_limit.limit
+
+    @property
+    def stats(self) -> dict[str, int | float | None]:
+        """
+        Cumulative session statistics for diagnostics and benchmarking.
+
+        Keys:
+            total_http_requests:      Raw HTTP requests made (GET + POST).
+            total_procedures:         Individual tRPC procedures called
+                                      (a batch of 50 counts as 50).
+            window_refreshes:         Times the rate-limit window refreshed
+                                      (remaining jumped back up in headers).
+            total_wait_seconds:       Time spent sleeping on rate limits.
+            quota_used_current_window: Requests consumed in the current window.
+            quota_limit_per_window:   Server-reported max requests per window.
+            quota_remaining:          Requests remaining in current window.
+        """
+        rl = self._http._rate_limit
+        return {
+            "total_http_requests": rl.total_http_requests,
+            "total_procedures": rl.total_procedures,
+            "window_refreshes": rl.window_refreshes,
+            "total_wait_seconds": rl.total_wait_seconds,
+            "quota_used_current_window": rl.quota_used_current_window,
+            "quota_limit_per_window": rl.limit,
+            "quota_remaining": rl.remaining,
+        }
 
     # ------------------------------------------------------------------
     # Batch

@@ -136,6 +136,7 @@ class CompanyResource(BaseResource):
             return auto_paginate_pages(
                 self.get_companies,
                 max_pages=max_pages,
+                cursor=cursor,
                 cursor_end=cursor_end,
                 user_id=user_id,
                 per_page=per_page,

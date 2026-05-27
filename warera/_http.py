@@ -30,6 +30,11 @@ import time
 from typing import Any
 from urllib.parse import quote
 
+try:
+    import orjson as _orjson  # ~5-10× faster JSON serialization
+except ImportError:
+    _orjson = None  # type: ignore[assignment,unused-ignore]
+
 import httpx
 from tenacity import (
     AsyncRetrying,
@@ -72,6 +77,9 @@ class _RateLimitState:
     monotonic timestamp at which the window will reset.  Before the next
     outgoing request we check whether we still have quota; if not, we
     sleep until the reset timestamp.
+
+    Cumulative statistics are tracked across all window refreshes so
+    callers can inspect total usage for the session's lifetime.
     """
 
     def __init__(self) -> None:
@@ -83,6 +91,16 @@ class _RateLimitState:
         # loop is running, so there is never a window where two coroutines
         # race to create the first Lock object.
         self._lock: asyncio.Lock | None = None
+
+        # ── Cumulative stats (survive window refreshes) ──
+        self.total_http_requests: int = 0    # raw HTTP requests (GET + POST)
+        self.total_procedures: int = 0       # individual tRPC procedures called
+        self.window_refreshes: int = 0       # times we waited for a window reset
+        self.total_wait_seconds: float = 0.0 # total time spent sleeping on rate limits
+        # Track per-window usage: when remaining jumps back up (window refresh
+        # detected from headers), we finalize the previous window's consumption.
+        self._prev_remaining: int | None = None
+        self._prev_limit: int | None = None
 
     def ensure_lock(self) -> None:
         """Create the asyncio.Lock if it does not yet exist.
@@ -101,6 +119,11 @@ class _RateLimitState:
             self._lock = asyncio.Lock()
         return self._lock
 
+    def record_request(self, num_procedures: int = 1) -> None:
+        """Record that an HTTP request was made carrying N procedures."""
+        self.total_http_requests += 1
+        self.total_procedures += num_procedures
+
     def update(self, headers: httpx.Headers) -> None:
         """Parse and store the rate-limit values from a response's headers."""
         raw_limit = headers.get("ratelimit-limit")
@@ -113,11 +136,27 @@ class _RateLimitState:
 
         if raw_remaining is not None:
             with contextlib.suppress(ValueError):
-                self.remaining = int(raw_remaining)
+                new_remaining = int(raw_remaining)
+                # Detect window refresh: remaining jumped up compared to
+                # what we last saw, meaning the server gave us a fresh window.
+                if (
+                    self._prev_remaining is not None
+                    and new_remaining > self._prev_remaining
+                ):
+                    self.window_refreshes += 1
+                self._prev_remaining = new_remaining
+                self.remaining = new_remaining
 
         if raw_reset is not None:
             with contextlib.suppress(ValueError):
                 self._reset_at = time.monotonic() + float(raw_reset)
+
+    @property
+    def quota_used_current_window(self) -> int | None:
+        """Requests consumed in the current window (from headers)."""
+        if self.limit is not None and self.remaining is not None:
+            return self.limit - self.remaining
+        return None
 
     async def wait_if_exhausted(self) -> None:
         """
@@ -145,9 +184,11 @@ class _RateLimitState:
             if self.remaining is not None and self.remaining <= 0 and self._reset_at is not None:
                 wait_secs = self._reset_at - time.monotonic()
                 if wait_secs > 0:
+                    self.total_wait_seconds += wait_secs
                     await asyncio.sleep(wait_secs)
                 # Reset state — next response will give us fresh values.
                 self.remaining = None
+                self._prev_remaining = None
                 self._reset_at = None
 
 
@@ -177,6 +218,8 @@ class HttpSession:
         self._rate_limit = _RateLimitState()
         self._auto_batch_queue: list[tuple[str, dict[str, Any], asyncio.Future[Any]]] = []
         self._auto_batch_task: asyncio.Task[None] | None = None
+        # Cache the retry config so we don't rebuild it on every request.
+        self._retry_config: AsyncRetrying | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -223,17 +266,19 @@ class HttpSession:
     # ------------------------------------------------------------------
 
     def _retrying(self) -> AsyncRetrying:
-        """Return an AsyncRetrying instance configured from this session's params."""
-        return AsyncRetrying(
-            retry=retry_if_exception(_is_retryable),
-            stop=stop_after_attempt(self._max_retries),
-            wait=wait_exponential(
-                multiplier=self._retry_backoff,
-                min=self._retry_backoff,
-                max=10,
-            ),
-            reraise=True,
-        )
+        """Return a cached AsyncRetrying instance configured from this session's params."""
+        if self._retry_config is None:
+            self._retry_config = AsyncRetrying(
+                retry=retry_if_exception(_is_retryable),
+                stop=stop_after_attempt(self._max_retries),
+                wait=wait_exponential(
+                    multiplier=self._retry_backoff,
+                    min=self._retry_backoff,
+                    max=10,
+                ),
+                reraise=True,
+            )
+        return self._retry_config
 
     # ------------------------------------------------------------------
     # Single call  →  GET /procedure?input=<json>
@@ -255,8 +300,9 @@ class HttpSession:
         return await fut
 
     async def _auto_batch_flush(self) -> None:
-        # Wait a brief moment to let other concurrent event-loop tasks queue up
-        await asyncio.sleep(0.010)
+        # Wait a brief moment to let other concurrent event-loop tasks queue up.
+        # 5ms is enough for the event loop to yield without adding noticeable latency.
+        await asyncio.sleep(0.005)
 
         queue = self._auto_batch_queue
         self._auto_batch_queue = []
@@ -300,7 +346,10 @@ class HttpSession:
         await self._ensure_client()
 
         clean = {k: v for k, v in params.items() if v is not None}
-        encoded = quote(json.dumps(clean, separators=(",", ":")), safe="")
+        if _orjson is not None:
+            encoded = quote(_orjson.dumps(clean).decode(), safe="")
+        else:
+            encoded = quote(json.dumps(clean, separators=(",", ":")), safe="")
         url = f"/{procedure}?input={encoded}"
 
         response = await self._get_with_retry(url)
@@ -317,6 +366,7 @@ class HttpSession:
                 resp = await self._client.get(url, headers=self._auth_headers())
                 # Update rate-limit state from response headers.
                 self._rate_limit.update(resp.headers)
+                self._rate_limit.record_request(num_procedures=1)
                 self._check_response(resp)
                 result = resp
         return result  # type: ignore[return-value]
@@ -351,6 +401,9 @@ class HttpSession:
         if not procedures:
             return []
 
+        # Strip None values from all inputs (consistency with GET requests)
+        clean_inputs = [{k: v for k, v in inp.items() if v is not None} for inp in inputs]
+
         # Clamp to the server hard limit regardless of what was passed.
         _MAX_BATCH = 50
         effective = min(max(1, chunk_size), _MAX_BATCH)
@@ -359,7 +412,7 @@ class HttpSession:
         if len(procedures) <= effective:
             proc_path = ",".join(procedures)
             url = f"/{proc_path}?batch=1"
-            body = {str(i): inp for i, inp in enumerate(inputs)}
+            body = {str(i): inp for i, inp in enumerate(clean_inputs)}
             raw_list = await self._post_batch_with_retry(url, body)
             return self._unwrap_batch(raw_list, procedures)
 
@@ -369,7 +422,7 @@ class HttpSession:
         chunks: list[tuple[list[str], list[dict[str, Any]]]] = []
         for start in range(0, len(procedures), effective):
             end = start + effective
-            chunks.append((procedures[start:end], inputs[start:end]))
+            chunks.append((procedures[start:end], clean_inputs[start:end]))
 
         async def _run_chunk(procs: list[str], inps: list[dict[str, Any]]) -> list[Any]:
             proc_path = ",".join(procs)
@@ -390,9 +443,14 @@ class HttpSession:
                 if self._client is None:
                     raise RuntimeError("HTTP client is not initialised — call __aenter__ first")
                 headers = {**self._auth_headers(), "Content-Type": "application/json"}
-                resp = await self._client.post(url, json=body, headers=headers)
+                if _orjson is not None:
+                    content = _orjson.dumps(body)
+                    resp = await self._client.post(url, content=content, headers=headers)
+                else:
+                    resp = await self._client.post(url, json=body, headers=headers)
                 # Update rate-limit state from response headers.
                 self._rate_limit.update(resp.headers)
+                self._rate_limit.record_request(num_procedures=len(body))
                 self._check_response(resp)
                 data = resp.json()
                 if not isinstance(data, list):

@@ -68,6 +68,7 @@ class UserResource(BaseResource):
             return auto_paginate_pages(
                 self.get_by_country,
                 max_pages=max_pages,
+                cursor=cursor,
                 cursor_end=cursor_end,
                 country_id=country_id,
                 limit=limit,

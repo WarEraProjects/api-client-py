@@ -216,25 +216,22 @@ async def fetch_many_by_ids(
     # Enforce the server hard limit regardless of what the caller passed.
     effective_size = min(batch_size, MAX_BATCH_SIZE)
     chunks = [ids[i : i + effective_size] for i in range(0, len(ids), effective_size)]
-    
-    if concurrency is not None:
-        sem = asyncio.Semaphore(concurrency)
-        async def fetch_chunk(chunk: list[str]) -> list[Any]:
-            async with sem:
-                procedures = [procedure] * len(chunk)
-                inputs = [{id_param: id_} for id_ in chunk]
-                try:
-                    return cast(list[Any], await http.post_batch(procedures, inputs))
-                except WareraBatchError as exc:
-                    return [exc.results.get(i, None) for i in range(len(chunk))]
-    else:
-        async def fetch_chunk(chunk: list[str]) -> list[Any]:
+
+    sem = asyncio.Semaphore(concurrency) if concurrency is not None else None
+
+    async def fetch_chunk(chunk: list[str]) -> list[Any]:
+        async def _do() -> list[Any]:
             procedures = [procedure] * len(chunk)
             inputs = [{id_param: id_} for id_ in chunk]
             try:
                 return cast(list[Any], await http.post_batch(procedures, inputs))
             except WareraBatchError as exc:
                 return [exc.results.get(i, None) for i in range(len(chunk))]
+
+        if sem is not None:
+            async with sem:
+                return await _do()
+        return await _do()
 
     chunk_results = await asyncio.gather(*[fetch_chunk(c) for c in chunks])
     return [item for sublist in chunk_results for item in sublist]
