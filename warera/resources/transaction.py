@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import typing
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from .._enums import TransactionType
 from .._pagination import auto_paginate_pages
@@ -122,69 +121,18 @@ class TransactionResource(BaseResource):
         Because the chunks are fetched concurrently, the underlying HTTP client will
         automatically batch them into single POST requests.
         """
-        if isinstance(oldest_date, str):
-            oldest_date = oldest_date.replace("Z", "+00:00")
-            oldest_date = datetime.fromisoformat(oldest_date)
-        if oldest_date.tzinfo is None:
-            oldest_date = oldest_date.replace(tzinfo=timezone.utc)
-
-        now = datetime.now(timezone.utc)
+        from .._pagination import parallel_collect_all
         
-        # Generate time chunks
-        chunks: list[tuple[str | None, datetime]] = []
-        current_end = now
-        
-        while current_end > oldest_date:
-            chunk_start = max(oldest_date, current_end - timedelta(days=time_slice_days))
-            
-            # We need a cursor representing `current_end` (unless it's the very first chunk).
-            # A synthetic cursor is just the ISO date string + a dummy MongoDB ID.
-            if current_end == now:
-                cursor = None
-            else:
-                # Format: 2026-03-28T05:28:52.832Z|000000000000000000000000
-                iso_str = current_end.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                cursor = f"{iso_str}|000000000000000000000000"
-                
-            chunks.append((cursor, chunk_start))
-            current_end = chunk_start
-            
-        all_transactions: list[Transaction] = []
-        sem = asyncio.Semaphore(concurrency)
-        
-        async def fetch_chunk(cur: str | None, cur_end: datetime) -> list[Transaction]:
-            chunk_txs: list[Transaction] = []
-            async with sem:
-                async for page in await self.get_paginated(
-                    auto_paginate=True,
-                    limit=limit,
-                    cursor=cur,
-                    cursor_end=cur_end.isoformat(),
-                    user_id=user_id,
-                    mu_id=mu_id,
-                    country_id=country_id,
-                    party_id=party_id,
-                    item_code=item_code,
-                    transaction_type=transaction_type,
-                ):
-                    chunk_txs.extend(page.items)
-            return chunk_txs
-            
-        chunk_results = await asyncio.gather(*[
-            fetch_chunk(c, start) for c, start in chunks
-        ])
-        
-        for res in chunk_results:
-            all_transactions.extend(res)
-            
-        # Sort descending by created_at since the chunks were fetched out of order,
-        # and deduplicate by ID just in case there was boundary overlap.
-        seen = set()
-        unique_txs = []
-        for tx in all_transactions:
-            if tx.id not in seen:
-                seen.add(tx.id)
-                unique_txs.append(tx)
-                
-        unique_txs.sort(key=lambda x: x.created_at or "", reverse=True)
-        return unique_txs
+        return await parallel_collect_all(
+            self.get_paginated,
+            oldest_date=oldest_date,
+            time_slice_days=time_slice_days,
+            concurrency=concurrency,
+            limit=limit,
+            user_id=user_id,
+            mu_id=mu_id,
+            country_id=country_id,
+            party_id=party_id,
+            item_code=item_code,
+            transaction_type=transaction_type,
+        )

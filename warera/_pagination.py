@@ -1,16 +1,21 @@
+from __future__ import annotations
+
+import asyncio
+import contextlib
+from collections.abc import AsyncGenerator, Callable, Coroutine
+from datetime import datetime, timedelta, timezone
+from typing import Any, TypeVar
+
+from .models.common import CursorPage
+
 """
 Pagination helpers for cursor-based WarEra API endpoints.
 
 Provides the `auto_paginate_pages` engine that powers `auto_paginate=True`.
 """
 
-from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Callable, Coroutine
-from datetime import datetime
-from typing import Any, TypeVar
 
-from .models.common import CursorPage
 
 T = TypeVar("T")
 
@@ -83,3 +88,93 @@ async def auto_paginate_pages(
                 break
 
         cursor = page.next_cursor
+
+
+
+
+T = TypeVar("T")
+
+WARERA_EPOCH = datetime(2025, 1, 1, tzinfo=timezone.utc)
+
+async def parallel_collect_all(
+    fetch_fn: Callable[..., Coroutine[Any, Any, CursorPage[T] | AsyncGenerator[CursorPage[T], None]]],
+    oldest_date: datetime | str | None = None,
+    time_slice_days: int = 30,
+    concurrency: int = 20,
+    **kwargs: Any,
+) -> list[T]:
+    """
+    Generic parallel time-slicing engine to fetch paginated resources concurrently.
+    Automatically generates chunks of `time_slice_days` from `now` backward to `oldest_date`.
+    """
+    if oldest_date is None:
+        oldest_date = WARERA_EPOCH
+    elif isinstance(oldest_date, str):
+        oldest_date = datetime.fromisoformat(oldest_date.replace("Z", "+00:00"))
+
+    now = datetime.now(timezone.utc)
+    chunks: list[tuple[str | None, datetime]] = []
+    current_end = now
+
+    while current_end > oldest_date:
+        chunk_start = max(oldest_date, current_end - timedelta(days=time_slice_days))
+        
+        if current_end == now:
+            cursor = None
+        else:
+            iso_str = current_end.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            cursor = f"{iso_str}|000000000000000000000000"
+            
+        chunks.append((cursor, chunk_start))
+        current_end = chunk_start
+
+    sem = asyncio.Semaphore(concurrency)
+
+    async def fetch_chunk(cur: str | None, cur_end: datetime) -> list[T]:
+        chunk_items: list[T] = []
+        async with sem:
+            result = await fetch_fn(
+                auto_paginate=True,
+                cursor=cur,
+                cursor_end=cur_end.isoformat(),
+                **kwargs
+            )
+            # Support both AsyncGenerator and returning a CursorPage directly
+            if hasattr(result, "__aiter__"):
+                async for page in result: # type: ignore
+                    chunk_items.extend(page.items)
+            else:
+                # Actually, auto_paginate=True should always return AsyncGenerator,
+                # but if it somehow returns CursorPage, we just handle it.
+                chunk_items.extend(result.items) # type: ignore
+        return chunk_items
+
+    chunk_results = await asyncio.gather(*[
+        fetch_chunk(c, start) for c, start in chunks
+    ])
+
+    all_items = [item for chunk in chunk_results for item in chunk]
+    unique_items: list[T] = []
+    seen = set()
+
+    for item in all_items:
+        # Pydantic models usually have .id or fallback to hashing?
+        # In this API, almost everything has an ID.
+        item_id = getattr(item, "id", None)
+        if item_id is None:
+            # Can not reliably deduplicate, just append
+            unique_items.append(item)
+            continue
+            
+        if item_id not in seen:
+            seen.add(item_id)
+            unique_items.append(item)
+
+    # Attempt to sort globally by descending created_at
+    with contextlib.suppress(Exception):
+        unique_items.sort(
+            key=lambda x: getattr(x, "created_at", getattr(x, "createdAt", "")),
+            reverse=True
+        )
+        
+    return unique_items

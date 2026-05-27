@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import typing
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Any
 
 from .._pagination import auto_paginate_pages
@@ -157,15 +158,26 @@ class CompanyResource(BaseResource):
             items.extend(page.items)
         return items
 
-    async def collect_all(self, **kwargs: Any) -> list[Company]:
+    async def collect_all(
+        self,
+        oldest_date: datetime | str | None = None,
+        time_slice_days: int = 30,
+        concurrency: int = 10,
+        **kwargs: Any
+    ) -> list[Company]:
         """
-        Convenience: fetch all companies globally.
-        This is much faster than fetching by individual users.
+        Convenience: fetch all companies globally (or by country if passed) using parallel slicing.
+        This is much faster than fetching sequentially.
         """
-        items = []
-        async for page in await self.get_companies(per_page=50, auto_paginate=True, **kwargs):
-            items.extend(page.items)
-        return items
+        from .._pagination import parallel_collect_all
+        return await parallel_collect_all(
+            self.get_companies,
+            oldest_date=oldest_date,
+            time_slice_days=time_slice_days,
+            concurrency=concurrency,
+            per_page=50,
+            **kwargs,
+        )
 
     async def get_recommended_regions(
         self,

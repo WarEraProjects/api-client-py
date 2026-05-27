@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import typing
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Any
 
 from .._pagination import auto_paginate_pages
@@ -82,12 +84,24 @@ class UserResource(BaseResource):
         )
         return CursorPage.from_raw(raw, UserLite)
 
-    async def collect_by_country(self, country_id: str, **kwargs: Any) -> list[UserLite]:
-        """Return all users in a country as a flat list."""
-        items = []
-        async for page in await self.get_by_country(country_id=country_id, auto_paginate=True, **kwargs):
-            items.extend(page.items)
-        return items
+    async def collect_by_country(
+        self, 
+        country_id: str, 
+        oldest_date: datetime | str | None = None,
+        time_slice_days: int = 30,
+        concurrency: int = 10,
+        **kwargs: Any
+    ) -> list[UserLite]:
+        """Return all users in a country as a flat list, fetched in parallel."""
+        from .._pagination import parallel_collect_all
+        return await parallel_collect_all(
+            self.get_by_country,
+            oldest_date=oldest_date,
+            time_slice_days=time_slice_days,
+            concurrency=concurrency,
+            country_id=country_id,
+            **kwargs,
+        )
 
     async def collect_all(self, *, concurrency: int = 20) -> list[UserLite]:
         """
@@ -116,13 +130,21 @@ class UserResource(BaseResource):
 
         async def fetch_for_country(cid: str) -> list[UserLite]:
             async with sem:
-                items = []
-                async for page in await self.get_by_country(country_id=cid, limit=50, auto_paginate=True):
-                    items.extend(page.items)
-                return items
+                # We use collect_by_country, but set its concurrency low to not exhaust the semaphore
+                # since we're already scaling concurrency horizontally across countries.
+                return await self.collect_by_country(country_id=cid, limit=100, concurrency=2)
 
         results = await asyncio.gather(*[fetch_for_country(cid) for cid in country_ids])
-        return [user for users in results for user in users]
+        
+        all_users = [user for users in results for user in users]
+        # Attempt to sort globally
+        with contextlib.suppress(Exception):
+            all_users.sort(
+                key=lambda x: getattr(x, "created_at", getattr(x, "createdAt", "")),
+                reverse=True
+            )
+            
+        return all_users
 
     # ------------------------------------------------------------------
     # Batch helper
