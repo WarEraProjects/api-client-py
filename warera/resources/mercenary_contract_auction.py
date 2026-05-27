@@ -78,3 +78,30 @@ class MercenaryContractAuctionResource(BaseResource):
             cursor=cursor,
         )
         return CursorPage.from_raw(raw, MercenaryContractAuction)
+
+
+    async def paginate(self, **kwargs: typing.Any) -> typing.AsyncIterator[MercenaryContractAuction]:
+        """Yield individual items across all pages seamlessly."""
+        from .._pagination import paginate_items
+        # Attempt to use the class default paginated method name
+        fetch_fn = getattr(self, "get_paginated", None) or getattr(self, "get_many", None) or getattr(self, "get_all", None)
+        if fetch_fn is None:
+            raise NotImplementedError("Pagination not supported on this resource")
+            
+        async for item in paginate_items(fetch_fn, **kwargs):
+            yield item
+
+    async def collect_all(self, **kwargs: typing.Any) -> list[MercenaryContractAuction]:
+        """Fetch all items across all pages concurrently using parallel time-slicing."""
+        from .._pagination import parallel_collect_all
+        fetch_fn = getattr(self, "get_paginated", None) or getattr(self, "get_many", None) or getattr(self, "get_all", None)
+        if fetch_fn is None:
+            raise NotImplementedError("Pagination not supported on this resource")
+            
+        return await parallel_collect_all(
+            fetch_fn,
+            oldest_date=kwargs.pop("oldest_date", None),
+            time_slice_days=kwargs.pop("time_slice_days", 30),
+            concurrency=kwargs.pop("concurrency", 10),
+            **kwargs,
+        )

@@ -565,8 +565,8 @@ print(page.has_more)     # bool
 async for battle in client.battle.paginate(is_active=True):
     print(battle.id)
 
-# 3. Collect all pages into a flat list
-all_battles = await client.battle.get_active()
+# 3. Collect all pages into a flat list using the ultra-fast parallel time-slicing engine
+all_battles = await client.battle.collect_all()
 ```
 
 ---

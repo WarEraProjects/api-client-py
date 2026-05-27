@@ -176,3 +176,21 @@ async def parallel_collect_all(
         )
         
     return unique_items
+
+
+async def paginate_items(
+    fetch_fn: Callable[..., Coroutine[Any, Any, AsyncGenerator[CursorPage[T], None] | CursorPage[T]]],
+    **kwargs: Any,
+) -> AsyncGenerator[T, None]:
+    """
+    A simple wrapper to seamlessly yield individual items from an auto-paginating endpoint.
+    """
+    kwargs["auto_paginate"] = True
+    result = await fetch_fn(**kwargs)
+    if hasattr(result, "__aiter__"):
+        async for page in result:
+            for item in page.items:
+                yield item
+    else:
+        for item in result.items:
+            yield item
