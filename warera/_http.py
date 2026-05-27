@@ -265,19 +265,17 @@ class HttpSession:
     # ------------------------------------------------------------------
 
     def _retrying(self) -> AsyncRetrying:
-        """Return a cached AsyncRetrying instance configured from this session's params."""
-        if self._retry_config is None:
-            self._retry_config = AsyncRetrying(
-                retry=retry_if_exception(_is_retryable),
-                stop=stop_after_attempt(self._max_retries),
-                wait=wait_exponential(
-                    multiplier=self._retry_backoff,
-                    min=self._retry_backoff,
-                    max=10,
-                ),
-                reraise=True,
-            )
-        return self._retry_config
+        """Return a new AsyncRetrying instance configured from this session's params."""
+        return AsyncRetrying(
+            retry=retry_if_exception(_is_retryable),
+            stop=stop_after_attempt(self._max_retries),
+            wait=wait_exponential(
+                multiplier=self._retry_backoff,
+                min=self._retry_backoff,
+                max=10,
+            ),
+            reraise=True,
+        )
 
     # ------------------------------------------------------------------
     # Single call  →  GET /procedure?input=<json>
@@ -346,7 +344,7 @@ class HttpSession:
 
         clean = {k: v for k, v in params.items() if v is not None}
         if _orjson is not None:
-            encoded = quote(_orjson.dumps(clean).decode(), safe="")
+            encoded = quote(_orjson.dumps(clean), safe="")
         else:
             encoded = quote(json.dumps(clean, separators=(",", ":")), safe="")
         url = f"/{procedure}?input={encoded}"
@@ -451,7 +449,10 @@ class HttpSession:
                 self._rate_limit.update(resp.headers)
                 self._rate_limit.record_request(num_procedures=len(body))
                 self._check_response(resp)
-                data = resp.json()
+                if _orjson is not None:
+                    data = _orjson.loads(resp.content)
+                else:
+                    data = resp.json()
                 if not isinstance(data, list):
                     raise ValueError(
                         f"Expected list from batch endpoint, got {type(data).__name__}"
@@ -478,13 +479,13 @@ class HttpSession:
                 with contextlib.suppress(ValueError):
                     retry_after = float(raw_header)
             try:
-                body = resp.json()
+                body = _orjson.loads(resp.content) if _orjson is not None else resp.json()
             except Exception:
                 body = resp.text
             raise WareraRateLimitError(retry_after=retry_after, response_body=body)
 
         try:
-            body = resp.json()
+            body = _orjson.loads(resp.content) if _orjson is not None else resp.json()
         except Exception:
             body = resp.text
         _raise_for_status(resp.status_code, body)
@@ -498,7 +499,7 @@ class HttpSession:
           { "error": { "message": "...", "code": ... } }
         """
         try:
-            data = resp.json()
+            data = _orjson.loads(resp.content) if _orjson is not None else resp.json()
         except Exception as exc:
             raise ValueError(f"Non-JSON response from {procedure}: {resp.text}") from exc
 

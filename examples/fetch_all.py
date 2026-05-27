@@ -194,8 +194,8 @@ async def fetch_user_transactions(target: str) -> None:
             user_id=user.id,
             limit=100,
             oldest_date=user.created_at,
-            time_slice_days=30,
-            concurrency=20,
+            time_slice_days=0.05,
+            concurrency=1000,
         )
         sec.count = len(txs)
         print(f"  ✅ Fetched {len(txs)} transactions in {_elapsed(timer._t0)}")

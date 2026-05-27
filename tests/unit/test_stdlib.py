@@ -75,6 +75,10 @@ class _FakeResponse:
     def text(self):
         return json.dumps(self._data)
 
+    @property
+    def content(self):
+        return json.dumps(self._data).encode("utf-8")
+
 
 httpx_stub.AsyncClient = mock.MagicMock
 httpx_stub.Response = _FakeResponse

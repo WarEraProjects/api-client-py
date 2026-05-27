@@ -129,7 +129,7 @@ class TransactionResource(BaseResource):
         party_id: str | None = None,
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
-        time_slice_days: int = 30,
+        time_slice_days: float = 0.2,
         concurrency: int = 500,
     ) -> list[Transaction]:
         """

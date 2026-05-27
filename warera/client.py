@@ -109,7 +109,7 @@ class WareraClient:
         api_key: str | None = None,
         *,
         base_url: str = DEFAULT_BASE_URL,
-        timeout: float = 10.0,
+        timeout: float = 30.0,
         max_retries: int = 3,
         retry_backoff_factor: float = 0.5,
         batch_size: int = 50,

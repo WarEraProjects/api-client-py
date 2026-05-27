@@ -124,7 +124,7 @@ WARERA_MAX_CONCURRENCY = int(os.environ.get("WARERA_MAX_CONCURRENCY", 500))
 async def parallel_collect_all(
     fetch_fn: Callable[..., Coroutine[Any, Any, CursorPage[T] | AsyncGenerator[CursorPage[T], None]]],
     oldest_date: datetime | str | None = None,
-    time_slice_days: int = 30,
+    time_slice_days: float = 0.2,
     concurrency: int | None = None,
     **kwargs: Any,
 ) -> list[T]:
@@ -190,22 +190,22 @@ async def parallel_collect_all(
         fetch_chunk(c, start) for c, start in chunks
     ])
 
-    all_items = [item for chunk in chunk_results for item in chunk]
     unique_items: list[T] = []
     seen = set()
 
-    for item in all_items:
-        # Pydantic models usually have .id or fallback to hashing?
-        # In this API, almost everything has an ID.
-        item_id = getattr(item, "id", None)
-        if item_id is None:
-            # Can not reliably deduplicate, just append
-            unique_items.append(item)
-            continue
-            
-        if item_id not in seen:
-            seen.add(item_id)
-            unique_items.append(item)
+    for chunk in chunk_results:
+        for item in chunk:
+            # Pydantic models usually have .id or fallback to hashing?
+            # In this API, almost everything has an ID.
+            item_id = getattr(item, "id", None)
+            if item_id is None:
+                # Can not reliably deduplicate, just append
+                unique_items.append(item)
+                continue
+                
+            if item_id not in seen:
+                seen.add(item_id)
+                unique_items.append(item)
 
     # Attempt to sort globally by descending created_at
     with contextlib.suppress(Exception):
