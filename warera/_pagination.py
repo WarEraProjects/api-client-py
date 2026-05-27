@@ -67,7 +67,7 @@ async def auto_paginate_pages(
         **kwargs:   Extra arguments forwarded to the fetch_fn.
     """
     warnings.warn(
-        "`auto_paginate=True` is deprecated and will be removed in v0.3.0. "
+        "`auto_paginate=True` is deprecated and will be removed in v0.2.1. "
         "Use `auto_items=True` instead to stream items directly.",
         DeprecationWarning,
         stacklevel=2

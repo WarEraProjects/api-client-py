@@ -51,6 +51,7 @@ users = await warera.user.get_many(["1", "2", "3", ...])
 In `0.1.x`, we relied heavily on generator loops. In `0.2.0`, pagination has been modernized:
 
 - **`auto_items=True`**: To yield single items across pages, simply pass `auto_items=True` to any paginated method. This replaces the old `paginate()` wrapper.
+  *(Note: The old `paginate()` wrapper and `auto_paginate=True` parameter are now formally deprecated and will be removed in v0.2.1).*
 - **`collect_all()`**: Completely rewritten. It now uses a **parallel time-slicing engine** with synthetic cursors. Instead of fetching pages sequentially, it splits the history into chunks and fetches them all concurrently, resulting in a >5x speedup for massive datasets!
 
 **Usage:**

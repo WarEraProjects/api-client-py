@@ -569,6 +569,8 @@ async for battle in client.battle.get_many(is_active=True, auto_items=True):
 all_battles = await client.battle.collect_all()
 ```
 
+*(Note: The old `paginate()` wrapper and `auto_paginate=True` parameter are now formally deprecated and will be removed in v0.2.1).*
+
 ---
 
 ## Batch Requests
