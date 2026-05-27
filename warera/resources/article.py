@@ -157,7 +157,7 @@ class ArticleResource(BaseResource):
         return await parallel_collect_all(
             fetch_fn,
             oldest_date=kwargs.pop("oldest_date", None),
-            time_slice_days=kwargs.pop("time_slice_days", 30),
+            time_slice_days=kwargs.pop("time_slice_days", 0.2),
             concurrency=kwargs.pop("concurrency", 500),
             **kwargs,
         )
