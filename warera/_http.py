@@ -175,6 +175,8 @@ class HttpSession:
         self._retry_backoff = retry_backoff_factor
         self._client: httpx.AsyncClient | None = None
         self._rate_limit = _RateLimitState()
+        self._auto_batch_queue: list[tuple[str, dict[str, Any], asyncio.Future[Any]]] = []
+        self._auto_batch_task: asyncio.Task[None] | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -200,6 +202,8 @@ class HttpSession:
         self._rate_limit.ensure_lock()
 
     async def aclose(self) -> None:
+        if self._auto_batch_task and not self._auto_batch_task.done():
+            self._auto_batch_task.cancel()
         if self._client and not self._client.is_closed:
             await self._client.aclose()
 
@@ -238,8 +242,61 @@ class HttpSession:
     async def get(self, procedure: str, params: dict[str, Any]) -> Any:
         """
         Execute a single tRPC GET call.
-        Returns the parsed `result.data` from the response.
+        Automatically intercepts and bundles concurrent calls into a single batch POST
+        to drastically reduce network overhead and rate limit consumption.
         """
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        self._auto_batch_queue.append((procedure, params, fut))
+
+        if self._auto_batch_task is None:
+            self._auto_batch_task = loop.create_task(self._auto_batch_flush())
+
+        return await fut
+
+    async def _auto_batch_flush(self) -> None:
+        # Wait a brief moment to let other concurrent event-loop tasks queue up
+        await asyncio.sleep(0.010)
+
+        queue = self._auto_batch_queue
+        self._auto_batch_queue = []
+        self._auto_batch_task = None
+
+        if not queue:
+            return
+
+        if len(queue) == 1:
+            proc, params, fut = queue[0]
+            try:
+                res = await self._real_get(proc, params)
+                fut.set_result(res)
+            except Exception as e:
+                fut.set_exception(e)
+            return
+
+        procedures = [q[0] for q in queue]
+        inputs = [q[1] for q in queue]
+        futs = [q[2] for q in queue]
+
+        try:
+            results = await self.post_batch(procedures, inputs)
+            for fut, res in zip(futs, results, strict=True):
+                if not fut.done():
+                    fut.set_result(res)
+        except WareraBatchError as exc:
+            for i, fut in enumerate(futs):
+                if fut.done():
+                    continue
+                if i in exc.errors:
+                    fut.set_exception(exc.errors[i])
+                elif i in exc.results:
+                    fut.set_result(exc.results[i])
+        except Exception as e:
+            for fut in futs:
+                if not fut.done():
+                    fut.set_exception(e)
+
+    async def _real_get(self, procedure: str, params: dict[str, Any]) -> Any:
         await self._ensure_client()
 
         clean = {k: v for k, v in params.items() if v is not None}

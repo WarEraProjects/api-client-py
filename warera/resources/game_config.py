@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .._cache import async_memoize
 from ..models.game_config import GameConfig, GameDates
 from ._base import BaseResource
 
@@ -16,6 +17,7 @@ class GameConfigResource(BaseResource):
         raw = await self._get("gameConfig.getDates")
         return GameDates.model_validate(raw)
 
+    @async_memoize
     async def get(self) -> GameConfig:
         """Get the full static game configuration (items, resources, industries, etc.)."""
         raw = await self._get("gameConfig.getGameConfig")

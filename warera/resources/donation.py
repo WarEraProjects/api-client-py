@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
-from typing import Any
 
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.donation import Donation, DonationTotals
 from ._base import BaseResource
@@ -16,6 +16,7 @@ class DonationResource(BaseResource):
       • donation.getTotalDonations
     """
 
+    @typing.overload
     async def get_paginated(
         self,
         *,
@@ -25,7 +26,39 @@ class DonationResource(BaseResource):
         limit: int = 20,
         cursor: str | None = None,
         direction: str | None = None,
-    ) -> CursorPage[Donation]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Donation]: ...
+
+    @typing.overload
+    async def get_paginated(
+        self,
+        *,
+        mu_id: str | None = None,
+        country_id: str | None = None,
+        party_id: str | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+        direction: str | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[Donation]]: ...
+
+    async def get_paginated(
+        self,
+        *,
+        mu_id: str | None = None,
+        country_id: str | None = None,
+        party_id: str | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+        direction: str | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Donation] | AsyncIterator[CursorPage[Donation]]:
         """
         Get donations (cursor-paginated), filtered by target entity.
 
@@ -34,6 +67,18 @@ class DonationResource(BaseResource):
         Args:
             direction: ``"forward"`` (default) or ``"backward"`` pagination.
         """
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_paginated,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                mu_id=mu_id,
+                country_id=country_id,
+                party_id=party_id,
+                limit=limit,
+                direction=direction,
+            )
+
         raw = await self._get(
             "donation.getManyPaginated",
             muId=mu_id,
@@ -44,15 +89,6 @@ class DonationResource(BaseResource):
             direction=direction,
         )
         return CursorPage.from_raw(raw, Donation)
-
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[Donation]:
-        """Async generator over donations matching the given filters."""
-        async for item in paginate(self.get_paginated, **kwargs):
-            yield item
-
-    async def collect_all(self, **kwargs: Any) -> list[Donation]:
-        """Collect all donations across all pages."""
-        return await collect_all(self.get_paginated, **kwargs)
 
     async def get_totals(
         self,

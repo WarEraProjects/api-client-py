@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
 from typing import Any
 
 from .._enums import BattleDirection, BattleFilter
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.battle import Battle, BattleLive
 from ..models.common import CursorPage
 from ._base import BaseResource
@@ -37,6 +38,7 @@ class BattleResource(BaseResource):
         )
         return BattleLive.model_validate(raw)
 
+    @typing.overload
     async def get_many(
         self,
         *,
@@ -48,8 +50,58 @@ class BattleResource(BaseResource):
         defender_region_id: str | None = None,
         war_id: str | None = None,
         country_id: str | None = None,
-    ) -> CursorPage[Battle]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Battle]: ...
+
+    @typing.overload
+    async def get_many(
+        self,
+        *,
+        is_active: bool | None = None,
+        limit: int = 10,
+        cursor: str | None = None,
+        direction: BattleDirection | str | None = None,
+        filter: BattleFilter | str | None = None,
+        defender_region_id: str | None = None,
+        war_id: str | None = None,
+        country_id: str | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[Battle]]: ...
+
+    async def get_many(
+        self,
+        *,
+        is_active: bool | None = None,
+        limit: int = 10,
+        cursor: str | None = None,
+        direction: BattleDirection | str | None = None,
+        filter: BattleFilter | str | None = None,
+        defender_region_id: str | None = None,
+        war_id: str | None = None,
+        country_id: str | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Battle] | AsyncIterator[CursorPage[Battle]]:
         """Get battles with optional filters (cursor-paginated)."""
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_many,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                is_active=is_active,
+                limit=limit,
+                direction=direction,
+                filter=filter,
+                defender_region_id=defender_region_id,
+                war_id=war_id,
+                country_id=country_id,
+            )
+
         raw = await self._get(
             "battle.getBattles",
             isActive=is_active,
@@ -64,14 +116,8 @@ class BattleResource(BaseResource):
         return CursorPage.from_raw(raw, Battle)
 
     async def get_active(self, **kwargs: Any) -> list[Battle]:
-        """Convenience: return all currently active battles."""
-        return await collect_all(self.get_many, is_active=True, **kwargs)
-
-    # ------------------------------------------------------------------
-    # Pagination helpers
-    # ------------------------------------------------------------------
-
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[Battle]:
-        """Async generator over battles matching the given filters."""
-        async for item in paginate(self.get_many, **kwargs):
-            yield item
+        """Convenience: fetch all active battles across the globe."""
+        items = []
+        async for page in await self.get_many(is_active=True, auto_paginate=True, **kwargs):
+            items.extend(page.items)
+        return items

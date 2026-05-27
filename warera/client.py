@@ -113,6 +113,7 @@ class WareraClient:
         max_retries: int = 3,
         retry_backoff_factor: float = 0.5,
         batch_size: int = 50,
+        concurrency: int | None = None,
     ) -> None:
         """
         Args:
@@ -124,6 +125,7 @@ class WareraClient:
             max_retries:          Max retry attempts for 429 / 5xx errors.
             retry_backoff_factor: Multiplier for exponential backoff between retries.
             batch_size:           Default max procedures per batch POST.
+            concurrency:          Default max concurrent chunk POSTs per batch flush.
         """
         self._http = HttpSession(
             api_key=api_key,
@@ -134,6 +136,7 @@ class WareraClient:
         )
         # Clamp to server hard limit — the API rejects batches > 50 procedures.
         self._batch_size = min(batch_size, MAX_BATCH_SIZE)
+        self._concurrency = concurrency
 
         # --- Resource namespaces ---
         self.user = UserResource(self._http)
@@ -207,7 +210,7 @@ class WareraClient:
     # Batch
     # ------------------------------------------------------------------
 
-    def batch(self, batch_size: int | None = None) -> BatchSession:
+    def batch(self, batch_size: int | None = None, concurrency: int | None = None) -> BatchSession:
         """
         Create a BatchSession for sending multiple procedures in one HTTP round-trip.
 
@@ -221,11 +224,13 @@ class WareraClient:
 
         Args:
             batch_size: Override the client's default batch chunk size.
+            concurrency: Override the client's default concurrency limit.
         """
         return BatchSession(
             http=self._http,
             # BatchSession will also clamp; being explicit here is good for clarity.
             batch_size=min(batch_size, MAX_BATCH_SIZE) if batch_size else self._batch_size,
+            concurrency=concurrency if concurrency is not None else self._concurrency,
         )
 
     # ------------------------------------------------------------------

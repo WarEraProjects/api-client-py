@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
 from typing import Any
 
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.work_offer import WorkOffer
 from ._base import BaseResource
@@ -73,6 +74,7 @@ class WorkOfferResource(BaseResource):
             items = []
         return [WorkOffer.model_validate(o) for o in items]
 
+    @typing.overload
     async def get_paginated(
         self,
         *,
@@ -83,7 +85,41 @@ class WorkOfferResource(BaseResource):
         energy: float | None = None,
         production: float | None = None,
         citizenship: str | None = None,
-    ) -> CursorPage[WorkOffer]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[WorkOffer]: ...
+
+    @typing.overload
+    async def get_paginated(
+        self,
+        *,
+        limit: int = 10,
+        cursor: str | None = None,
+        user_id: str | None = None,
+        region_id: str | None = None,
+        energy: float | None = None,
+        production: float | None = None,
+        citizenship: str | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[WorkOffer]]: ...
+
+    async def get_paginated(
+        self,
+        *,
+        limit: int = 10,
+        cursor: str | None = None,
+        user_id: str | None = None,
+        region_id: str | None = None,
+        energy: float | None = None,
+        production: float | None = None,
+        citizenship: str | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[WorkOffer] | AsyncIterator[CursorPage[WorkOffer]]:
         """
         Get work offers with optional filters (cursor-paginated).
 
@@ -92,6 +128,19 @@ class WorkOfferResource(BaseResource):
             production:  Filter: offers with at least this production value.
             citizenship: Filter: offers open to this citizenship.
         """
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_paginated,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                limit=limit,
+                user_id=user_id,
+                region_id=region_id,
+                energy=energy,
+                production=production,
+                citizenship=citizenship,
+            )
+
         raw = await self._get(
             "workOffer.getWorkOffersPaginated",
             limit=limit,
@@ -132,12 +181,3 @@ class WorkOfferResource(BaseResource):
         if isinstance(raw, dict):
             return WageStats(raw)
         return WageStats({})
-
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[WorkOffer]:
-        """Async generator over work offers matching the given filters."""
-        async for item in paginate(self.get_paginated, **kwargs):
-            yield item
-
-    async def collect_all(self, **kwargs: Any) -> list[WorkOffer]:
-        """Collect all work offers across all pages."""
-        return await collect_all(self.get_paginated, **kwargs)

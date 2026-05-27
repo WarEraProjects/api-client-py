@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
-from typing import Any
 
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.party import Party
 from ._base import BaseResource
@@ -21,6 +21,7 @@ class PartyResource(BaseResource):
         raw = await self._get("party.getById", partyId=party_id)
         return Party.model_validate(raw)
 
+    @typing.overload
     async def get_paginated(
         self,
         *,
@@ -28,7 +29,35 @@ class PartyResource(BaseResource):
         limit: int = 20,
         cursor: str | None = None,
         direction: str | None = None,
-    ) -> CursorPage[Party]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Party]: ...
+
+    @typing.overload
+    async def get_paginated(
+        self,
+        *,
+        country_id: str | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+        direction: str | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[Party]]: ...
+
+    async def get_paginated(
+        self,
+        *,
+        country_id: str | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+        direction: str | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Party] | AsyncIterator[CursorPage[Party]]:
         """
         Get political parties (cursor-paginated), optionally filtered by country.
 
@@ -36,6 +65,16 @@ class PartyResource(BaseResource):
             country_id: Filter to parties in this country.
             direction:  ``"forward"`` (default) or ``"backward"`` pagination.
         """
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_paginated,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                country_id=country_id,
+                limit=limit,
+                direction=direction,
+            )
+
         raw = await self._get(
             "party.getManyPaginated",
             countryId=country_id,
@@ -45,15 +84,9 @@ class PartyResource(BaseResource):
         )
         return CursorPage.from_raw(raw, Party)
 
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[Party]:
-        """Async generator over all parties matching the given filters."""
-        async for item in paginate(self.get_paginated, **kwargs):
-            yield item
-
-    async def collect_all(self, **kwargs: Any) -> list[Party]:
-        """Collect all parties across all pages."""
-        return await collect_all(self.get_paginated, **kwargs)
-
     async def get_by_country(self, country_id: str) -> list[Party]:
         """Convenience: fetch all parties in a given country."""
-        return await self.collect_all(country_id=country_id)
+        items = []
+        async for page in await self.get_paginated(country_id=country_id, auto_paginate=True):
+            items.extend(page.items)
+        return items

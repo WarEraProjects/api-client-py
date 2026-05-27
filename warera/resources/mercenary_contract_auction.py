@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
-from typing import Any
 
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.mercenary_contract_auction import MercenaryContractAuction
 from ._base import BaseResource
@@ -15,6 +15,7 @@ class MercenaryContractAuctionResource(BaseResource):
       • mercenaryContractAuction.getPaginatedAuctions
     """
 
+    @typing.overload
     async def get_paginated_auctions(
         self,
         *,
@@ -23,10 +24,51 @@ class MercenaryContractAuctionResource(BaseResource):
         status: str | None = None,
         limit: int = 10,
         cursor: str | None = None,
-    ) -> CursorPage[MercenaryContractAuction]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[MercenaryContractAuction]: ...
+
+    @typing.overload
+    async def get_paginated_auctions(
+        self,
+        *,
+        country_id: str | None = None,
+        battle_id: str | None = None,
+        status: str | None = None,
+        limit: int = 10,
+        cursor: str | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[MercenaryContractAuction]]: ...
+
+    async def get_paginated_auctions(
+        self,
+        *,
+        country_id: str | None = None,
+        battle_id: str | None = None,
+        status: str | None = None,
+        limit: int = 10,
+        cursor: str | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[MercenaryContractAuction] | AsyncIterator[CursorPage[MercenaryContractAuction]]:
         """
         Get mercenary contract auctions (cursor-paginated).
         """
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_paginated_auctions,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                country_id=country_id,
+                battle_id=battle_id,
+                status=status,
+                limit=limit,
+            )
+
         raw = await self._get(
             "mercenaryContractAuction.getPaginatedAuctions",
             countryId=country_id,
@@ -36,12 +78,3 @@ class MercenaryContractAuctionResource(BaseResource):
             cursor=cursor,
         )
         return CursorPage.from_raw(raw, MercenaryContractAuction)
-
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[MercenaryContractAuction]:
-        """Async generator over mercenary contract auctions matching the given filters."""
-        async for item in paginate(self.get_paginated_auctions, **kwargs):
-            yield item
-
-    async def collect_all(self, **kwargs: Any) -> list[MercenaryContractAuction]:
-        """Collect all mercenary contract auctions across all pages."""
-        return await collect_all(self.get_paginated_auctions, **kwargs)

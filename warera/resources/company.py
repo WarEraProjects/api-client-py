@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import typing
 from collections.abc import AsyncIterator
 from typing import Any
 
-from .._batch import fetch_many_by_ids
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.company import Company
 from ._base import BaseResource
@@ -96,14 +97,50 @@ class CompanyResource(BaseResource):
         raw = await self._get("company.getById", companyId=company_id)
         return Company.model_validate(raw)
 
+    @typing.overload
     async def get_companies(
         self,
         *,
         user_id: str | None = None,
         per_page: int = 10,
         cursor: str | None = None,
-    ) -> CursorPage[Company]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Company]: ...
+
+    @typing.overload
+    async def get_companies(
+        self,
+        *,
+        user_id: str | None = None,
+        per_page: int = 10,
+        cursor: str | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[Company]]: ...
+
+    async def get_companies(
+        self,
+        *,
+        user_id: str | None = None,
+        per_page: int = 10,
+        cursor: str | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Company] | AsyncIterator[CursorPage[Company]]:
         """Get companies, optionally filtered by owner user ID (cursor-paginated)."""
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_companies,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                user_id=user_id,
+                per_page=per_page,
+            )
+
         raw = await self._get(
             "company.getCompanies",
             userId=user_id,
@@ -114,7 +151,20 @@ class CompanyResource(BaseResource):
 
     async def get_by_user(self, user_id: str, **kwargs: Any) -> list[Company]:
         """Convenience: fetch all companies owned by a user (collects all pages)."""
-        return await collect_all(self.get_companies, user_id=user_id, **kwargs)
+        items = []
+        async for page in await self.get_companies(user_id=user_id, auto_paginate=True, **kwargs):
+            items.extend(page.items)
+        return items
+
+    async def collect_all(self, **kwargs: Any) -> list[Company]:
+        """
+        Convenience: fetch all companies globally.
+        This is much faster than fetching by individual users.
+        """
+        items = []
+        async for page in await self.get_companies(per_page=50, auto_paginate=True, **kwargs):
+            items.extend(page.items)
+        return items
 
     async def get_recommended_regions(
         self,
@@ -158,21 +208,63 @@ class CompanyResource(BaseResource):
         return CompanyProductionBonus.from_raw({})
 
     # ------------------------------------------------------------------
-    # Pagination helpers
+    # Batch helpers
     # ------------------------------------------------------------------
 
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[Company]:
-        """Async generator over all companies matching the given filters."""
-        async for item in paginate(self.get_companies, **kwargs):
-            yield item
+    async def get_many(self, company_ids: list[str]) -> list[Company | None]:
+        """Fetch multiple companies by ID concurrently using the auto-batcher."""
+        
+        futs = [self.get(cid) for cid in company_ids]
+        results = await asyncio.gather(*futs, return_exceptions=True)
+        return [r if not isinstance(r, BaseException) else None for r in results]
 
-    # ------------------------------------------------------------------
-    # Batch helper
-    # ------------------------------------------------------------------
+    async def collect_by_users(
+        self,
+        user_ids: list[str],
+        *,
+        concurrency: int = 20,
+    ) -> list[Company]:
+        """
+        Fetch all companies owned by a list of users.
+        Uses native tRPC batching to group up to 50 user queries per HTTP request,
+        making it extremely fast and rate-limit friendly.
 
-    async def get_many(self, company_ids: list[str], batch_size: int = 50) -> list[Company]:
-        """Fetch multiple companies by ID in batched POST requests."""
-        raw_list = await fetch_many_by_ids(
-            self._http, "company.getById", "companyId", company_ids, batch_size
-        )
-        return [Company.model_validate(r) for r in raw_list]
+        Args:
+            user_ids:    List of user ID strings to fetch companies for.
+            concurrency: Max concurrent requests.
+
+        Returns:
+            A flat list of all :class:`Company` objects across every user.
+        """
+        from .._batch import BatchSession
+
+        if not user_ids:
+            return []
+
+        all_companies: list[Company] = []
+        current_queries = [{"userId": uid} for uid in user_ids]
+
+        # Loop until all pages for all users have been fetched
+        while current_queries:
+            next_queries = []
+            batch = BatchSession(self._http, concurrency=concurrency)
+            
+            # Queue up all current queries
+            items = []
+            for q in current_queries:
+                items.append((q, batch.add("company.getCompanies", {**q, "perPage": 50})))
+                
+            # Flush sends them to the API in concurrent chunks of 50
+            await batch.flush()
+            
+            # Process results and check for next pages
+            for q, item in items:
+                if item.ok:
+                    page = CursorPage.from_raw(item.result, Company)
+                    all_companies.extend(page.items)
+                    if page.has_more and page.next_cursor:
+                        next_queries.append({**q, "cursor": page.next_cursor})
+                        
+            current_queries = next_queries
+
+        return all_companies

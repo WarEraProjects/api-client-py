@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0] — 2026-05-27
+
+### 🚀 Major Architectural Updates
+
+- **Global API DX**: You no longer need to instantiate `WareraClient`. Just `import warera` and call methods globally (e.g. `await warera.user.get_by_id("123")`). The client will automatically pick up the `WARERA_API_KEY` environment variable.
+- **Transparent Auto-Batching**: The `get_many` methods (e.g. `user.get_many()`) no longer take a `batch_size` argument. All requests are seamlessly buffered for 10ms and dispatched in optimal chunks of 50 via a background task. 
+- **In-Memory Concurrency Caching**: Static resources (like `game_config.get()`, `country.find_by_name()`, `item_trading.get_prices()`) are aggressively memoized to eliminate redundant API calls across concurrent coroutines.
+- **Pagination Overhaul**: The legacy `collect_all()` and `paginate()` generator wrappers have been removed to reduce bloat.
+
+For full details on migrating your code from `v0.1.x`, see the [v0.2.0 Migration Guide](MIGRATION-0.2.0.md).
+
 ## [0.1.9] — 2026-05-26
 
 ### New endpoints (1:1 Parity with TypeScript Client)

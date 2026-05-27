@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
-from typing import Any
 
 from .._enums import ArticleType
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.article import Article, ArticleLite
 from ..models.common import CursorPage
 from ._base import BaseResource
@@ -28,6 +28,7 @@ class ArticleResource(BaseResource):
         raw = await self._get("article.getArticleLiteById", articleId=article_id)
         return ArticleLite.model_validate(raw)
 
+    @typing.overload
     async def get_paginated(
         self,
         type: ArticleType | str,
@@ -38,7 +39,41 @@ class ArticleResource(BaseResource):
         categories: list[str] | None = None,
         languages: list[str] | None = None,
         positive_score_only: bool | None = None,
-    ) -> CursorPage[ArticleLite]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[ArticleLite]: ...
+
+    @typing.overload
+    async def get_paginated(
+        self,
+        type: ArticleType | str,
+        *,
+        limit: int = 10,
+        cursor: str | None = None,
+        user_id: str | None = None,
+        categories: list[str] | None = None,
+        languages: list[str] | None = None,
+        positive_score_only: bool | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[ArticleLite]]: ...
+
+    async def get_paginated(
+        self,
+        type: ArticleType | str,
+        *,
+        limit: int = 10,
+        cursor: str | None = None,
+        user_id: str | None = None,
+        categories: list[str] | None = None,
+        languages: list[str] | None = None,
+        positive_score_only: bool | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[ArticleLite] | AsyncIterator[CursorPage[ArticleLite]]:
         """
         Get articles (cursor-paginated).
 
@@ -48,7 +83,23 @@ class ArticleResource(BaseResource):
             categories:         Filter by category list.
             languages:          Filter by language codes (e.g. ["en", "ro"]).
             positive_score_only: When True, exclude downvoted articles.
+            auto_paginate:      If True, returns an AsyncIterator of CursorPages.
+            max_pages:          Maximum number of pages to fetch when auto-paginating.
+            cursor_end:         Date string. Auto-pagination stops when cursor date is older than this.
         """
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_paginated,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                type=type,
+                limit=limit,
+                user_id=user_id,
+                categories=categories,
+                languages=languages,
+                positive_score_only=positive_score_only,
+            )
+
         raw = await self._get(
             "article.getArticlesPaginated",
             type=type,
@@ -60,12 +111,3 @@ class ArticleResource(BaseResource):
             positiveScoreOnly=positive_score_only,
         )
         return CursorPage.from_raw(raw, ArticleLite)
-
-    async def paginate(self, type: ArticleType | str, **kwargs: Any) -> AsyncIterator[ArticleLite]:
-        """Async generator over articles of the given type."""
-        async for item in paginate(self.get_paginated, type=type, **kwargs):
-            yield item
-
-    async def collect_all(self, type: ArticleType | str, **kwargs: Any) -> list[ArticleLite]:
-        """Collect all articles of the given type across all pages."""
-        return await collect_all(self.get_paginated, type=type, **kwargs)

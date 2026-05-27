@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
 from typing import Any
 
 from .._enums import ActionLogActionType
-from .._pagination import collect_all, paginate
+from .._pagination import auto_paginate_pages
 from ..models.action_log import ActionLog
 from ..models.common import CursorPage
 from ._base import BaseResource
@@ -16,6 +17,7 @@ class ActionLogResource(BaseResource):
       • actionLog.getPaginated  (cursor-paginated)
     """
 
+    @typing.overload
     async def get_many(
         self,
         *,
@@ -25,7 +27,39 @@ class ActionLogResource(BaseResource):
         mu_id: str | None = None,
         country_id: str | None = None,
         action_type: ActionLogActionType | str | None = None,
-    ) -> CursorPage[ActionLog]:
+        auto_paginate: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[ActionLog]: ...
+
+    @typing.overload
+    async def get_many(
+        self,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+        user_id: str | None = None,
+        mu_id: str | None = None,
+        country_id: str | None = None,
+        action_type: ActionLogActionType | str | None = None,
+        auto_paginate: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[CursorPage[ActionLog]]: ...
+
+    async def get_many(
+        self,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+        user_id: str | None = None,
+        mu_id: str | None = None,
+        country_id: str | None = None,
+        action_type: ActionLogActionType | str | None = None,
+        auto_paginate: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[ActionLog] | AsyncIterator[CursorPage[ActionLog]]:
         """
         Get paginated action logs with optional filtering.
 
@@ -37,6 +71,18 @@ class ActionLogResource(BaseResource):
             country_id:  Filter by country ID.
             action_type: Filter by action type.
         """
+        if auto_paginate:
+            return auto_paginate_pages(
+                self.get_many,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                limit=limit,
+                user_id=user_id,
+                mu_id=mu_id,
+                country_id=country_id,
+                action_type=action_type,
+            )
+
         raw = await self._get(
             "actionLog.getPaginated",
             limit=limit,
@@ -50,13 +96,7 @@ class ActionLogResource(BaseResource):
 
     async def get_all(self, **kwargs: Any) -> list[ActionLog]:
         """Convenience: collect all action logs matching the given filters."""
-        return await collect_all(self.get_many, **kwargs)
-
-    # ------------------------------------------------------------------
-    # Pagination helpers
-    # ------------------------------------------------------------------
-
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[ActionLog]:
-        """Async generator over action logs matching the given filters."""
-        async for item in paginate(self.get_many, **kwargs):
-            yield item
+        items = []
+        async for page in await self.get_many(auto_paginate=True, **kwargs):
+            items.extend(page.items)
+        return items

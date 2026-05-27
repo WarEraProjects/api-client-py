@@ -5,12 +5,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > A robust, fully-typed, async-first Python client for the [WarEra](https://warera.io) tRPC API (v0.24.5-beta).
-
+> 
+> **⚠️ Upgrading from v0.1.x?** Please read the [v0.2.0 Migration Guide](MIGRATION-0.2.0.md).
+> 
 ```python
-async with WareraClient(api_key="YOUR_KEY") as client:
-    user   = await client.user.get_by_id("12345")
-    prices = await client.item_trading.get_prices()
-    gov    = await client.government.get("7")
+import warera
+
+async def main():
+    user   = await warera.user.get_by_id("12345")
+    prices = await warera.item_trading.get_prices()
+    gov    = await warera.government.get("7")
 ```
 
 ## Features
@@ -41,24 +45,25 @@ Requires Python 3.10+.
 
 ```python
 import asyncio
-from warera import WareraClient
+import warera
+
+# The global module automatically reads WARERA_API_KEY from your environment.
+# You can also manually set it via: warera.set_api_key("YOUR_KEY")
 
 async def main():
-    # API key is optional - also reads WARERA_API_KEY env var
-    async with WareraClient(api_key="YOUR_KEY") as client:
+    # Simple lookups
+    user    = await warera.user.get_by_id("12345")
+    country = await warera.country.find_by_name("Ukraine")
+    gov     = await warera.government.get(country.id)
+    prices  = await warera.item_trading.get_prices()
 
-        # Simple lookups
-        user    = await client.user.get_by_id("12345")
-        country = await client.country.find_by_name("Ukraine")
-        gov     = await client.government.get(country.id)
-        prices  = await client.item_trading.get_prices()
+    print(user.username, country.name)
+    print(f"Iron: {prices.get('iron').price}")
 
-        print(user.username, country.name)
-        print(f"Iron: {prices.get('iron').price}")
-
-        # Paginated - stream all users in a country
-        async for u in client.user.paginate_by_country(country.id, limit=50):
-            print(u.username)
+    # Paginated
+    page = await warera.user.get_paginated(country_id=country.id, limit=50)
+    for u in page.items:
+        print(u.username)
 
 asyncio.run(main())
 ```
@@ -66,12 +71,12 @@ asyncio.run(main())
 ### Sync
 
 ```python
-from warera.sync import WareraClient
+import warera.sync
 
-client = WareraClient(api_key="YOUR_KEY")
-user    = client.user.get_by_id("12345")
-prices  = client.item_trading.get_prices()
-battles = client.battle.get_active()   # collects all pages automatically
+warera.sync.set_api_key("YOUR_KEY")
+
+user    = warera.sync.user.get_by_id("12345")
+prices  = warera.sync.item_trading.get_prices()
 ```
 
 ---

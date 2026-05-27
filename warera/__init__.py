@@ -18,6 +18,8 @@ Sync:
     user = client.user.get_by_id("12345")
 """
 
+import typing
+
 from ._enums import (
     ActionLogActionType,
     ArticleType,
@@ -86,11 +88,113 @@ from .models import (
     WorkStats,
 )
 
-__version__ = "0.1.8"
+if typing.TYPE_CHECKING:
+    from .resources.action_log import ActionLogResource
+    from .resources.article import ArticleResource
+    from .resources.battle import BattleResource
+    from .resources.battle_loot_summary import BattleLootSummaryResource
+    from .resources.battle_order import BattleOrderResource
+    from .resources.battle_ranking import BattleRankingResource
+    from .resources.company import CompanyResource
+    from .resources.country import CountryResource
+    from .resources.donation import DonationResource
+    from .resources.election import ElectionResource
+    from .resources.event import EventResource
+    from .resources.game_config import GameConfigResource
+    from .resources.game_stat import GameStatResource
+    from .resources.government import GovernmentResource
+    from .resources.inventory import InventoryResource
+    from .resources.item_trading import ItemTradingResource
+    from .resources.mercenary_contract_auction import MercenaryContractAuctionResource
+    from .resources.mu import MUResource
+    from .resources.mu_member import MuMemberResource
+    from .resources.party import PartyResource
+    from .resources.ranking import RankingResource
+    from .resources.region import RegionResource
+    from .resources.round_ import RoundResource
+    from .resources.search import SearchResource
+    from .resources.tournament import TournamentResource
+    from .resources.transaction import TransactionResource
+    from .resources.upgrade import UpgradeResource
+    from .resources.user import UserResource
+    from .resources.work import WorkResource
+    from .resources.work_offer import WorkOfferResource
+    from .resources.worker import WorkerResource
+
+    action_log: ActionLogResource
+    article: ArticleResource
+    battle: BattleResource
+    battle_loot_summary: BattleLootSummaryResource
+    battle_order: BattleOrderResource
+    battle_ranking: BattleRankingResource
+    company: CompanyResource
+    country: CountryResource
+    donation: DonationResource
+    election: ElectionResource
+    event: EventResource
+    game_config: GameConfigResource
+    game_stat: GameStatResource
+    government: GovernmentResource
+    inventory: InventoryResource
+    item_trading: ItemTradingResource
+    mercenary_contract_auction: MercenaryContractAuctionResource
+    mu: MUResource
+    mu_member: MuMemberResource
+    party: PartyResource
+    ranking: RankingResource
+    region: RegionResource
+    round: RoundResource
+    search: SearchResource
+    tournament: TournamentResource
+    transaction: TransactionResource
+    upgrade: UpgradeResource
+    user: UserResource
+    work: WorkResource
+    work_offer: WorkOfferResource
+    worker: WorkerResource
+
+
+_default_client: WareraClient | None = None
+api_key: str | None = None
+
+
+def set_api_key(key: str) -> None:
+    """Configure the global API key for the module-level client."""
+    global api_key, _default_client
+    api_key = key
+    if _default_client is not None:
+        _default_client._http._api_key = key
+
+
+def get_client() -> WareraClient:
+    """Get or create the global WareraClient."""
+    global _default_client
+    if _default_client is None:
+        _default_client = WareraClient(api_key=api_key)
+    return _default_client
+
+
+_RESOURCE_NAMES = {
+    "action_log", "article", "battle", "battle_loot_summary", "battle_order", "battle_ranking",
+    "company", "country", "donation", "election", "event", "game_config", "game_stat", "government",
+    "inventory", "item_trading", "mercenary_contract_auction", "mu", "mu_member", "party", "ranking",
+    "region", "round", "search", "tournament", "transaction", "upgrade", "user", "work",
+    "work_offer", "worker"
+}
+
+def __getattr__(name: str) -> typing.Any:
+    if name in _RESOURCE_NAMES:
+        return getattr(get_client(), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__version__ = "0.2.0"
 
 __all__ = [
     # Client
     "WareraClient",
+    "set_api_key",
+    "get_client",
     # Exceptions
     "WareraError",
     "WareraHTTPError",

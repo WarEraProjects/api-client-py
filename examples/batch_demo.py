@@ -47,8 +47,12 @@ async def example_many_companies(country_id: str) -> None:
         # Step 2 — batch fetch all users in one round-trip
         users = await client.user.get_many(user_ids)
         print(f"Fetched {len(users)} users via batch")
-        for u in users[:3]:
-            print(f"  {u.username} (leveling {u.leveling})")
+    print("\n--- Users ---")
+    for u in users:
+        if u is not None:
+            print(f"- {u.username} (Level {u.leveling.level if u.leveling else '?'})")
+        else:
+            print("- User not found or error")
 
 
 async def example_ruling_parties(country_ids: list[str]) -> None:
