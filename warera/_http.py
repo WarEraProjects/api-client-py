@@ -230,6 +230,8 @@ class HttpSession:
         timeout: float = 30.0,
         max_retries: int = 3,
         retry_backoff_factor: float = 0.5,
+        auto_batch_delay: float = 0.005,
+        event_hooks: dict[str, list[Any]] | None = None,
     ) -> None:
         # Resolve API key: explicit arg > env var > None
         self._api_key: str | None = api_key or os.environ.get(_ENV_KEY)
@@ -241,6 +243,8 @@ class HttpSession:
         self._rate_limit = _RateLimitState()
         self._auto_batch_queue: list[tuple[str, dict[str, Any], asyncio.Future[Any]]] = []
         self._auto_batch_task: asyncio.Task[None] | None = None
+        self._auto_batch_delay = auto_batch_delay
+        self._event_hooks = event_hooks
         # Cache the retry config so we don't rebuild it on every request.
         self._retry_config: AsyncRetrying | None = None
         self._swr_cache = SWRCache()
@@ -265,6 +269,7 @@ class HttpSession:
                 follow_redirects=True,
                 http2=True,
                 limits=httpx.Limits(max_connections=200, max_keepalive_connections=50),
+                event_hooks=self._event_hooks,
             )
         # Ensure the rate-limit lock is created inside the running event loop.
         # This is safe to call repeatedly — it is a no-op after the first call.
@@ -342,8 +347,7 @@ class HttpSession:
 
     async def _auto_batch_flush(self) -> None:
         # Wait a brief moment to let other concurrent event-loop tasks queue up.
-        # 5ms is enough for the event loop to yield without adding noticeable latency.
-        await asyncio.sleep(0.005)
+        await asyncio.sleep(self._auto_batch_delay)
 
         queue = self._auto_batch_queue
         self._auto_batch_queue = []

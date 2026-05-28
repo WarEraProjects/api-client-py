@@ -7,3 +7,4 @@ build/
 warera_client.egg-info/
 .mypy_cache
 dist/
+scratch/

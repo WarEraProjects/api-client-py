@@ -51,7 +51,7 @@ users = await warera.user.get_many(["1", "2", "3", ...])
 In `0.1.x`, we relied heavily on generator loops. In `0.2.0`, pagination has been modernized:
 
 - **`auto_items=True`**: To yield single items across pages, simply pass `auto_items=True` to any paginated method. This replaces the old `paginate()` wrapper.
-  *(Note: The old `paginate()` wrapper and `auto_paginate=True` parameter are now formally deprecated and will be removed in v0.2.1).*
+  *(Note: The old `paginate()` wrapper and `auto_paginate=True` parameter have been fully removed in 0.2.0).*
 - **`collect_all()`**: Completely rewritten. It now uses a **parallel time-slicing engine** with synthetic cursors. Instead of fetching pages sequentially, it splits the history into chunks and fetches them all concurrently, resulting in a >5x speedup for massive datasets!
 
 **Usage:**
@@ -68,6 +68,18 @@ all_parties = await client.party.collect_all(country_id="7")
 > **Extreme Throughput Caution**: The `collect_all` and `get_many` engines default to an extreme concurrency of `500` (and `time_slice_days=0.2`) to perfectly saturate the 500 req/min API rate limit. While the client safely protects against 429 errors and DDoS mitigation logic by jittering bursts, this concurrency can cause 502 Bad Gateway errors on the API side if querying heavy endpoints (like thousands of transactions), or hit OS File Descriptor limits locally.
 > You can globally dial down the concurrency limit by setting the `WARERA_MAX_CONCURRENCY` environment variable (e.g. `export WARERA_MAX_CONCURRENCY=50`), or by overriding `concurrency=100` and `time_slice_days=1` directly in the `collect_all` method call.
 
-## 4. Static Resources Caching
+## 4. Static Resources Caching (SWR)
 
-Static resources like `warera.game_config.get()` or `warera.country.find_by_name()` are now aggressively cached in-memory concurrently. You don't need to wrap these calls in your own cache loops anymore; the SDK does it for you.
+Static resources like `warera.game_config.get()` or `warera.country.get_all()` are now cached using a highly optimized **Stale-While-Revalidate (SWR)** pattern. You don't need to wrap these calls in your own cache loops anymore; the SDK does it for you. It instantly serves stale data (if available) while firing a background task to refresh the cache seamlessly.
+
+## 5. HTTP/2 and Network Optimizations
+
+The client now defaults to HTTP/2. By keeping a single TCP connection alive and multiplexing requests, API round-trip times are significantly faster, dropping overhead massively compared to 0.1.x.
+
+## 6. Tracing, Logging, and Observability
+
+We've introduced complete visibility into the SDK's mechanics (conceptually mirroring tRPC's `httpBatchLink` and "Links" middleware):
+
+- **Standard Logging**: You can now enable `logging.getLogger("warera").setLevel(logging.DEBUG)` to watch exactly when the engine queues procedures, flushes batches, hits cache (stale vs fresh), and automatically sleeps on rate limits.
+- **Configurable Batch Delays**: `WareraClient` now accepts an `auto_batch_delay` (default: 5ms) allowing you to manually tune the batching collection window to your exact requirements.
+- **Event Hooks**: `WareraClient` now exposes `event_hooks={"request": [...], "response": [...]}` which perfectly matches the functionality of tRPC Links, allowing you to inject Prometheus metrics, datadog loggers, or raw JSON debuggers on every network call.

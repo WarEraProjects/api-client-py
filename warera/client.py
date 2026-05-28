@@ -114,6 +114,8 @@ class WareraClient:
         retry_backoff_factor: float = 0.5,
         batch_size: int = 50,
         concurrency: int | None = None,
+        auto_batch_delay: float = 0.005,
+        event_hooks: dict[str, list[Any]] | None = None,
     ) -> None:
         """
         Args:
@@ -126,6 +128,10 @@ class WareraClient:
             retry_backoff_factor: Multiplier for exponential backoff between retries.
             batch_size:           Default max procedures per batch POST.
             concurrency:          Default max concurrent chunk POSTs per batch flush.
+            auto_batch_delay:     Wait time (in seconds) to accumulate concurrent requests
+                                  before flushing the batch (aligns with tRPC httpBatchLink).
+            event_hooks:          Dictionary mapping 'request' or 'response' to a list of
+                                  async hook functions (aligns with tRPC Links/Middleware).
         """
         self._http = HttpSession(
             api_key=api_key,
@@ -133,6 +139,8 @@ class WareraClient:
             timeout=timeout,
             max_retries=max_retries,
             retry_backoff_factor=retry_backoff_factor,
+            auto_batch_delay=auto_batch_delay,
+            event_hooks=event_hooks,
         )
         # Clamp to server hard limit — the API rejects batches > 50 procedures.
         self._batch_size = min(batch_size, MAX_BATCH_SIZE)

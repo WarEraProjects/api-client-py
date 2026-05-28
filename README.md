@@ -569,7 +569,7 @@ async for battle in client.battle.get_many(is_active=True, auto_items=True):
 all_battles = await client.battle.collect_all()
 ```
 
-*(Note: The old `paginate()` wrapper and `auto_paginate=True` parameter are now formally deprecated and will be removed in v0.2.1).*
+*(Note: The old `paginate()` wrapper and `auto_paginate=True` parameter have been fully removed in 0.2.0).*
 
 ---
 
@@ -682,6 +682,8 @@ WareraClient(
     batch_size: int = 50,              # max procedures per batch POST chunk
                                        # values above 50 are silently clamped
                                        # to the server's hard limit
+    auto_batch_delay: float = 0.005,   # wait time in seconds to accumulate batch chunks
+    event_hooks: dict | None = None,   # dict mapping 'request'/'response' to async hooks
 )
 
 # You can also configure the extreme maximum concurrency for massive bulk fetching operations 
