@@ -544,9 +544,6 @@ class TestFetchManyByIds(unittest.TestCase):
         self.assertEqual(inputs[0], {"muId": "mu1"})
 
 
-
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # 7. Resource helpers (no HTTP, test parse logic)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -560,6 +557,7 @@ class TestCountryResourceLogic(unittest.TestCase):
 
         http = mock.MagicMock()
         http.get = mock.AsyncMock(return_value=return_value)
+        http.get_swr = mock.AsyncMock(return_value=return_value)
         return CountryResource(http)
 
     def test_get_all_from_dict(self):
@@ -594,6 +592,7 @@ class TestWorkerResourceLogic(unittest.TestCase):
 
         http = mock.MagicMock()
         http.get = mock.AsyncMock(return_value=return_value)
+        http.get_swr = mock.AsyncMock(return_value=return_value)
         return WorkerResource(http)
 
     def test_get_total_count_from_dict(self):
@@ -616,6 +615,7 @@ class TestUpgradeResourceValidation(unittest.TestCase):
 
         http = mock.MagicMock()
         http.get = mock.AsyncMock(return_value=return_value or {})
+        http.get_swr = mock.AsyncMock(return_value=return_value or {})
         return UpgradeResource(http)
 
     def test_raises_when_no_entity_id(self):
@@ -637,6 +637,7 @@ class TestSearchResourceValidation(unittest.TestCase):
 
         http = mock.MagicMock()
         http.get = mock.AsyncMock(return_value=return_value or {"results": []})
+        http.get_swr = mock.AsyncMock(return_value=return_value or {"results": []})
         return SearchResource(http)
 
     def test_raises_on_empty_query(self):

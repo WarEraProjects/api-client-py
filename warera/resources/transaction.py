@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 
 from .._enums import TransactionType
-from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.transaction import Transaction
 from ._base import BaseResource
@@ -29,11 +28,10 @@ class TransactionResource(BaseResource):
         party_id: str | None = None,
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
-        auto_paginate: typing.Literal[False] = False,
-        auto_items: bool = False,
+        auto_items: typing.Literal[True],
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Transaction]: ...
+    ) -> AsyncIterator[Transaction]: ...
 
     @typing.overload
     async def get_paginated(
@@ -47,11 +45,10 @@ class TransactionResource(BaseResource):
         party_id: str | None = None,
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
-        auto_paginate: typing.Literal[True],
-        auto_items: bool = False,
+        auto_items: typing.Literal[False] = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> AsyncIterator[CursorPage[Transaction]]: ...
+    ) -> CursorPage[Transaction]: ...
 
     async def get_paginated(
         self,
@@ -64,11 +61,10 @@ class TransactionResource(BaseResource):
         party_id: str | None = None,
         item_code: str | None = None,
         transaction_type: TransactionType | str | list[TransactionType | str] | None = None,
-        auto_paginate: bool = False,
         auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Transaction] | AsyncIterator[CursorPage[Transaction]] | AsyncIterator[Transaction]:
+    ) -> CursorPage[Transaction] | AsyncIterator[Transaction]:
         """
         Get paginated transactions with optional filters.
 
@@ -77,21 +73,8 @@ class TransactionResource(BaseResource):
         """
         if auto_items:
             from .._pagination import auto_paginate_items
+
             return auto_paginate_items(
-                self.get_paginated,
-                max_pages=max_pages,
-                cursor=cursor,
-                cursor_end=cursor_end,
-                limit=limit,
-                user_id=user_id,
-                mu_id=mu_id,
-                country_id=country_id,
-                party_id=party_id,
-                item_code=item_code,
-                transaction_type=transaction_type,
-            )
-        if auto_paginate:
-            return auto_paginate_pages(
                 self.get_paginated,
                 max_pages=max_pages,
                 cursor=cursor,
@@ -140,7 +123,7 @@ class TransactionResource(BaseResource):
         automatically batch them into single POST requests.
         """
         from .._pagination import parallel_collect_all
-        
+
         return await parallel_collect_all(
             self.get_paginated,
             oldest_date=oldest_date,

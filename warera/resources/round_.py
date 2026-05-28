@@ -32,7 +32,6 @@ class RoundResource(BaseResource):
         """Fetch multiple rounds by ID concurrently using the auto-batcher."""
         import asyncio
 
-        
         futs = [self.get(rid) for rid in round_ids]
         results = await asyncio.gather(*futs, return_exceptions=True)
         return [r if not isinstance(r, BaseException) else None for r in results]

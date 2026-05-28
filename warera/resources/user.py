@@ -7,7 +7,6 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
-from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.user import User, UserLite
 from ._base import BaseResource
@@ -38,11 +37,10 @@ class UserResource(BaseResource):
         *,
         limit: int = 10,
         cursor: str | None = None,
-        auto_paginate: typing.Literal[False] = False,
-        auto_items: bool = False,
+        auto_items: typing.Literal[True],
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[UserLite]: ...
+    ) -> AsyncIterator[UserLite]: ...
 
     @typing.overload
     async def get_by_country(
@@ -51,11 +49,10 @@ class UserResource(BaseResource):
         *,
         limit: int = 10,
         cursor: str | None = None,
-        auto_paginate: typing.Literal[True],
-        auto_items: bool = False,
+        auto_items: typing.Literal[False] = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> AsyncIterator[CursorPage[UserLite]]: ...
+    ) -> CursorPage[UserLite]: ...
 
     async def get_by_country(
         self,
@@ -63,24 +60,15 @@ class UserResource(BaseResource):
         *,
         limit: int = 10,
         cursor: str | None = None,
-        auto_paginate: bool = False,
         auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[UserLite] | AsyncIterator[CursorPage[UserLite]] | AsyncIterator[UserLite]:
+    ) -> CursorPage[UserLite] | AsyncIterator[UserLite]:
         """Get users belonging to a country (cursor-paginated)."""
         if auto_items:
             from .._pagination import auto_paginate_items
+
             return auto_paginate_items(
-                self.get_by_country,
-                max_pages=max_pages,
-                cursor=cursor,
-                cursor_end=cursor_end,
-                country_id=country_id,
-                limit=limit,
-            )
-        if auto_paginate:
-            return auto_paginate_pages(
                 self.get_by_country,
                 max_pages=max_pages,
                 cursor=cursor,
@@ -98,15 +86,16 @@ class UserResource(BaseResource):
         return CursorPage.from_raw(raw, UserLite)
 
     async def collect_by_country(
-        self, 
-        country_id: str, 
+        self,
+        country_id: str,
         oldest_date: datetime | str | None = None,
         time_slice_days: int = 30,
         concurrency: int = 500,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> list[UserLite]:
         """Return all users in a country as a flat list, fetched in parallel."""
         from .._pagination import parallel_collect_all
+
         return await parallel_collect_all(
             self.get_by_country,
             oldest_date=oldest_date,
@@ -148,15 +137,14 @@ class UserResource(BaseResource):
                 return await self.collect_by_country(country_id=cid, limit=100, concurrency=500)
 
         results = await asyncio.gather(*[fetch_for_country(cid) for cid in country_ids])
-        
+
         all_users = [user for users in results for user in users]
         # Attempt to sort globally
         with contextlib.suppress(Exception):
             all_users.sort(
-                key=lambda x: getattr(x, "created_at", getattr(x, "createdAt", "")),
-                reverse=True
+                key=lambda x: getattr(x, "created_at", getattr(x, "createdAt", "")), reverse=True
             )
-            
+
         return all_users
 
     # ------------------------------------------------------------------
@@ -166,21 +154,22 @@ class UserResource(BaseResource):
     async def get_many(self, user_ids: list[str], *, concurrency: int = 500) -> list[User | None]:
         """Fetch multiple users by ID concurrently using the auto-batcher."""
         from .._batch import BatchSession
+
         if not user_ids:
             return []
-            
+
         all_users: list[User | None] = []
         batch = BatchSession(self._http, concurrency=concurrency)
         items = []
         for uid in user_ids:
             items.append(batch.add("user.getUserById", {"userId": uid}))
-            
+
         await batch.flush()
-        
+
         for item in items:
             if item.ok and item.result:
                 all_users.append(User.model_validate(item.result))
             else:
                 all_users.append(None)
-                
+
         return all_users

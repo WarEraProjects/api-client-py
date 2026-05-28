@@ -3,7 +3,6 @@ from __future__ import annotations
 import typing
 from collections.abc import AsyncIterator
 
-from .._pagination import auto_paginate_pages
 from ..models.common import CursorPage
 from ..models.party import Party
 from ._base import BaseResource
@@ -29,11 +28,10 @@ class PartyResource(BaseResource):
         limit: int = 20,
         cursor: str | None = None,
         direction: str | None = None,
-        auto_paginate: typing.Literal[False] = False,
-        auto_items: bool = False,
+        auto_items: typing.Literal[True],
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Party]: ...
+    ) -> AsyncIterator[Party]: ...
 
     @typing.overload
     async def get_paginated(
@@ -43,11 +41,10 @@ class PartyResource(BaseResource):
         limit: int = 20,
         cursor: str | None = None,
         direction: str | None = None,
-        auto_paginate: typing.Literal[True],
-        auto_items: bool = False,
+        auto_items: typing.Literal[False] = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> AsyncIterator[CursorPage[Party]]: ...
+    ) -> CursorPage[Party]: ...
 
     async def get_paginated(
         self,
@@ -56,11 +53,10 @@ class PartyResource(BaseResource):
         limit: int = 20,
         cursor: str | None = None,
         direction: str | None = None,
-        auto_paginate: bool = False,
         auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Party] | AsyncIterator[CursorPage[Party]] | AsyncIterator[Party]:
+    ) -> CursorPage[Party] | AsyncIterator[Party]:
         """
         Get political parties (cursor-paginated), optionally filtered by country.
 
@@ -70,28 +66,45 @@ class PartyResource(BaseResource):
         """
         if auto_items:
             from .._pagination import auto_paginate_items
+
             return auto_paginate_items(
                 self.get_paginated,
                 max_pages=max_pages,
                 cursor_end=cursor_end,
-                **{k: v for k, v in locals().items() if k not in ("self", "auto_paginate", "auto_items", "max_pages", "cursor_end", "kwargs")}
+                **{
+                    k: v
+                    for k, v in locals().items()
+                    if k
+                    not in (
+                        "self",
+                        "auto_paginate",
+                        "auto_items",
+                        "max_pages",
+                        "cursor_end",
+                        "kwargs",
+                    )
+                },
             )
         if auto_items:
             from .._pagination import auto_paginate_items
+
             return auto_paginate_items(
                 self.get_paginated,
                 max_pages=max_pages,
                 cursor_end=cursor_end,
-                **{k: v for k, v in locals().items() if k not in ("self", "auto_paginate", "auto_items", "max_pages", "cursor_end", "kwargs")}
-            )
-        if auto_paginate:
-            return auto_paginate_pages(
-                self.get_paginated,
-                max_pages=max_pages,
-                cursor_end=cursor_end,
-                country_id=country_id,
-                limit=limit,
-                direction=direction,
+                **{
+                    k: v
+                    for k, v in locals().items()
+                    if k
+                    not in (
+                        "self",
+                        "auto_paginate",
+                        "auto_items",
+                        "max_pages",
+                        "cursor_end",
+                        "kwargs",
+                    )
+                },
             )
 
         raw = await self._get(
@@ -106,33 +119,30 @@ class PartyResource(BaseResource):
     async def get_by_country(self, country_id: str) -> list[Party]:
         """Convenience: fetch all parties in a given country."""
         items = []
-        async for page in await self.get_paginated(country_id=country_id, auto_paginate=True):
-            items.extend(page.items)
+        async for item in await self.get_paginated(country_id=country_id, auto_items=True):
+            items.append(item)
         return items
 
-
-    async def paginate(self, **kwargs: typing.Any) -> typing.AsyncIterator[Party]:
-        """Yield individual items across all pages seamlessly."""
-        from .._pagination import paginate_items
-        # Attempt to use the class default paginated method name
-        fetch_fn = getattr(self, "get_paginated", None) or getattr(self, "get_many", None) or getattr(self, "get_all", None)
-        if fetch_fn is None:
-            raise NotImplementedError("Pagination not supported on this resource")
-            
-        async for item in paginate_items(fetch_fn, **kwargs):
-            yield item
 
     async def collect_all(self, **kwargs: typing.Any) -> list[Party]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings
-        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
-        import warnings
-        warnings.warn("`collect_all()` is deprecated. Use `get_all()` directly.", DeprecationWarning, stacklevel=2)
+
+        warnings.warn(
+            "`collect_all()` is deprecated. Use `get_all()` directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from .._pagination import parallel_collect_all
-        fetch_fn = getattr(self, "get_paginated", None) or getattr(self, "get_many", None) or getattr(self, "get_all", None)
+
+        fetch_fn = (
+            getattr(self, "get_paginated", None)
+            or getattr(self, "get_many", None)
+            or getattr(self, "get_all", None)
+        )
         if fetch_fn is None:
             raise NotImplementedError("Pagination not supported on this resource")
-            
+
         return await parallel_collect_all(
             fetch_fn,
             oldest_date=kwargs.pop("oldest_date", None),

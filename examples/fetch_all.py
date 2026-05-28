@@ -18,20 +18,22 @@ import asyncio
 import contextlib
 import os
 import time
+import typing
 
 import warera
 
 # ── Timing & stats helpers ──────────────────────────────────────────────
 
+
 class BenchmarkTimer:
     """Records named timing sections and per-section quota snapshots."""
 
     def __init__(self) -> None:
-        self._sections: list[dict] = []
+        self._sections: list[dict[str, typing.Any]] = []
         self._t0 = time.perf_counter()
 
     @contextlib.contextmanager
-    def section(self, emoji: str, label: str):
+    def section(self, emoji: str, label: str) -> typing.Iterator["_SectionResult"]:
         """Context manager that records elapsed time and quota delta for a section."""
         t = time.perf_counter()
         result = _SectionResult()
@@ -45,16 +47,22 @@ class BenchmarkTimer:
         elapsed = time.perf_counter() - t
         stats_after = dict(client.stats)
 
-        self._sections.append({
-            "emoji": emoji,
-            "label": label,
-            "count": result.count,
-            "elapsed": elapsed,
-            "http_reqs": stats_after["total_http_requests"] - stats_before["total_http_requests"],
-            "procedures": stats_after["total_procedures"] - stats_before["total_procedures"],
-            "window_refreshes": stats_after["window_refreshes"] - stats_before["window_refreshes"],
-            "wait_secs": stats_after["total_wait_seconds"] - stats_before["total_wait_seconds"],
-        })
+        self._sections.append(
+            {
+                "emoji": emoji,
+                "label": label,
+                "count": result.count,
+                "elapsed": elapsed,
+                "http_reqs": (stats_after.get("total_http_requests") or 0)
+                - (stats_before.get("total_http_requests") or 0),
+                "procedures": (stats_after.get("total_procedures") or 0)
+                - (stats_before.get("total_procedures") or 0),
+                "window_refreshes": (stats_after.get("window_refreshes") or 0)
+                - (stats_before.get("window_refreshes") or 0),
+                "wait_secs": (stats_after.get("total_wait_seconds") or 0.0)
+                - (stats_before.get("total_wait_seconds") or 0.0),
+            }
+        )
 
     @property
     def total_elapsed(self) -> float:
@@ -71,7 +79,9 @@ class BenchmarkTimer:
         print(f"  ╔{'═' * w}╗")
         print(f"  ║  {'Benchmark Results':<{w - 3}}║")
         print(f"  ╠{'═' * w}╣")
-        print(f"  ║  {'Phase':<20}│ {'Items':>8} │ {'Time':>8} │ {'Reqs':>6} │ {'Procs':>7} │ {'Waits':>5} ║")
+        print(
+            f"  ║  {'Phase':<20}│ {'Items':>8} │ {'Time':>8} │ {'Reqs':>6} │ {'Procs':>7} │ {'Waits':>5} ║"
+        )
         print(f"  ║  {'─' * 20}┼{'─' * 10}┼{'─' * 10}┼{'─' * 8}┼{'─' * 9}┼{'─' * 7}║")
 
         for sec in self._sections:
@@ -86,9 +96,9 @@ class BenchmarkTimer:
 
         print(f"  ║  {'─' * 20}┼{'─' * 10}┼{'─' * 10}┼{'─' * 8}┼{'─' * 9}┼{'─' * 7}║")
         total = self.total_elapsed
-        total_reqs = s["total_http_requests"]
-        total_procs = s["total_procedures"]
-        total_waits = s["window_refreshes"]
+        total_reqs = s.get("total_http_requests") or 0
+        total_procs = s.get("total_procedures") or 0
+        total_waits = s.get("window_refreshes") or 0
         print(
             f"  ║  {'⏱️  Total':<20}│ {'':>8} │ "
             f"{total:>7.3f}s │ {total_reqs:>6} │ "
@@ -103,12 +113,16 @@ class BenchmarkTimer:
         print(f"  ├{'─' * w}┤")
 
         print(f"  │  📡 HTTP Requests      : {total_reqs:>6}  (GET + batch POST){' ' * 20}│")
-        print(f"  │  📦 tRPC Procedures    : {total_procs:>6}  (individual calls, incl. batched){' ' * 5}│")
+        print(
+            f"  │  📦 tRPC Procedures    : {total_procs:>6}  (individual calls, incl. batched){' ' * 5}│"
+        )
 
         # Batching efficiency
         if total_reqs > 0:
             batch_ratio = total_procs / total_reqs
-            print(f"  │  ⚡ Batch Efficiency   : {batch_ratio:>6.1f}× (avg procedures per HTTP request){' ' * 4}│")
+            print(
+                f"  │  ⚡ Batch Efficiency   : {batch_ratio:>6.1f}× (avg procedures per HTTP request){' ' * 4}│"
+            )
         else:
             print(f"  │  ⚡ Batch Efficiency   :    N/A{' ' * 39}│")
 
@@ -123,11 +137,15 @@ class BenchmarkTimer:
             print(f"  │  🪟 Window Size        :    N/A{' ' * 39}│")
 
         if total_waits > 0:
-            wait_time = s["total_wait_seconds"]
-            print(f"  │  🔄 Window Refreshes   : {total_waits:>6}  ({wait_time:.1f}s spent waiting){' ' * (20 - len(f'{wait_time:.1f}'))}│")
+            wait_time = s.get("total_wait_seconds") or 0.0
+            print(
+                f"  │  🔄 Window Refreshes   : {total_waits:>6}  ({wait_time:.1f}s spent waiting){' ' * (20 - len(f'{wait_time:.1f}'))}│"
+            )
             # Total quota consumed across all windows is simply the total HTTP requests made,
             # as each HTTP request consumes exactly 1 quota token regardless of batching.
-            print(f"  │  🔥 Total Quota Used   : {total_reqs:>6}  across {total_waits + 1} window(s){' ' * (18 - len(str(total_waits + 1)))}│")
+            print(
+                f"  │  🔥 Total Quota Used   : {total_reqs:>6}  across {total_waits + 1} window(s){' ' * (18 - len(str(total_waits + 1)))}│"
+            )
         else:
             print(f"  │  🔄 Window Refreshes   :      0  (stayed within single window){' ' * 7}│")
 
@@ -136,10 +154,14 @@ class BenchmarkTimer:
             bar_len = 20
             filled = int(bar_len * quota_used_cw / quota_per)
             bar = "█" * filled + "░" * (bar_len - filled)
-            print(f"  │  📊 Current Window     : {quota_used_cw:>6}/{quota_per} used ({pct:.0f}%) {bar}{' ' * (9 - len(str(quota_per)))}│")
+            print(
+                f"  │  📊 Current Window     : {quota_used_cw:>6}/{quota_per} used ({pct:.0f}%) {bar}{' ' * (9 - len(str(quota_per)))}│"
+            )
 
         if quota_rem is not None:
-            print(f"  │  💚 Remaining          : {quota_rem:>6}  requests in current window{' ' * 12}│")
+            print(
+                f"  │  💚 Remaining          : {quota_rem:>6}  requests in current window{' ' * 12}│"
+            )
 
         print(f"  └{'─' * w}┘")
         print()
@@ -147,6 +169,7 @@ class BenchmarkTimer:
 
 class _SectionResult:
     """Mutable holder so the section context manager can capture item counts."""
+
     __slots__ = ("count",)
 
     def __init__(self) -> None:
@@ -158,6 +181,7 @@ def _elapsed(t0: float) -> str:
 
 
 # ── User transaction fetch (interactive mode) ──────────────────────────
+
 
 async def fetch_user_transactions(target: str) -> None:
     timer = BenchmarkTimer()
@@ -193,7 +217,7 @@ async def fetch_user_transactions(target: str) -> None:
         txs = await warera.transaction.collect_all(
             user_id=user.id,
             limit=100,
-            oldest_date=user.created_at,
+            oldest_date=user.created_at or "",
             time_slice_days=0.05,
             concurrency=1000,
         )
@@ -204,6 +228,7 @@ async def fetch_user_transactions(target: str) -> None:
 
 
 # ── Full benchmark (non-interactive) ───────────────────────────────────
+
 
 async def run_benchmark() -> None:
     timer = BenchmarkTimer()
@@ -239,9 +264,12 @@ async def run_benchmark() -> None:
 
 # ── Main entry point ──────────────────────────────────────────────────
 
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description="warera-client benchmark / data fetch")
-    parser.add_argument("--api-key", default=None, help="API key (overrides WARERA_API_KEY env var)")
+    parser.add_argument(
+        "--api-key", default=None, help="API key (overrides WARERA_API_KEY env var)"
+    )
     parser.add_argument(
         "--benchmark",
         action="store_true",
@@ -278,7 +306,9 @@ async def main() -> None:
 
     # ── Interactive mode ──
     print("\n  ==================================================")
-    target = input("  👤 Enter a user ID/username for transactions (or press Enter for full massive fetch): ").strip()
+    target = input(
+        "  👤 Enter a user ID/username for transactions (or press Enter for full massive fetch): "
+    ).strip()
     print("  ==================================================\n")
     if target:
         await fetch_user_transactions(target)

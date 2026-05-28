@@ -40,6 +40,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from ._swr import SWRCache
 from .exceptions import (
     WareraBatchError,
     WareraError,
@@ -53,6 +54,28 @@ from .exceptions import (
 # Public constant so client.py can import it instead of duplicating the string.
 DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
 _ENV_KEY = "WARERA_API_KEY"
+
+
+def _get_rt_header() -> str:
+    default_retryable_status_codes = [408, 409, 425, 429, 500, 502, 503, 504]
+
+    def to_base36(num: int) -> str:
+        if num == 0:
+            return "0"
+        chars = "0123456789abcdefghijklmnopqrstuvwxyz"
+        res = ""
+        while num > 0:
+            num, rem = divmod(num, 36)
+            res = chars[rem] + res
+        return res
+
+    return ".".join(
+        to_base36(status * (index + 3) + index)
+        for index, status in enumerate(default_retryable_status_codes)
+    )
+
+
+_RT_HEADER = _get_rt_header()
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -90,10 +113,10 @@ class _RateLimitState:
         self._lock: asyncio.Lock | None = None
 
         # ── Cumulative stats (survive window refreshes) ──
-        self.total_http_requests: int = 0    # raw HTTP requests (GET + POST)
-        self.total_procedures: int = 0       # individual tRPC procedures called
-        self.window_refreshes: int = 0       # times we waited for a window reset
-        self.total_wait_seconds: float = 0.0 # total time spent sleeping on rate limits
+        self.total_http_requests: int = 0  # raw HTTP requests (GET + POST)
+        self.total_procedures: int = 0  # individual tRPC procedures called
+        self.window_refreshes: int = 0  # times we waited for a window reset
+        self.total_wait_seconds: float = 0.0  # total time spent sleeping on rate limits
         # Track per-window usage: when remaining jumps back up (window refresh
         # detected from headers), we finalize the previous window's consumption.
         self._prev_remaining: int | None = None
@@ -136,10 +159,7 @@ class _RateLimitState:
                 new_remaining = int(raw_remaining)
                 # Detect window refresh: remaining jumped up compared to
                 # what we last saw, meaning the server gave us a fresh window.
-                if (
-                    self._prev_remaining is not None
-                    and new_remaining > self._prev_remaining
-                ):
+                if self._prev_remaining is not None and new_remaining > self._prev_remaining:
                     self.window_refreshes += 1
                 self._prev_remaining = new_remaining
                 self.remaining = new_remaining
@@ -218,6 +238,7 @@ class HttpSession:
         self._auto_batch_task: asyncio.Task[None] | None = None
         # Cache the retry config so we don't rebuild it on every request.
         self._retry_config: AsyncRetrying | None = None
+        self._swr_cache = SWRCache()
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -235,8 +256,9 @@ class HttpSession:
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
                 timeout=self._timeout,
-                headers={"User-Agent": "warera-client"},
+                headers={"User-Agent": "warera-client", "rt": _RT_HEADER},
                 follow_redirects=True,
+                http2=True,
                 limits=httpx.Limits(max_connections=200, max_keepalive_connections=50),
             )
         # Ensure the rate-limit lock is created inside the running event loop.
@@ -295,6 +317,21 @@ class HttpSession:
             self._auto_batch_task = loop.create_task(self._auto_batch_flush())
 
         return await fut
+
+    async def get_swr(self, procedure: str, params: dict[str, Any], ttl_seconds: float) -> Any:
+        """
+        Execute a GET call wrapped in an SWR cache.
+        Returns stale data instantly if available, while fetching fresh data in the background.
+        """
+        # Create a deterministic cache key
+        import json
+        key_dict = {"p": procedure, "args": params}
+        key = json.dumps(key_dict, sort_keys=True)
+        
+        async def fetcher() -> Any:
+            return await self.get(procedure, params)
+
+        return await self._swr_cache.get(key, ttl_seconds, fetcher)
 
     async def _auto_batch_flush(self) -> None:
         # Wait a brief moment to let other concurrent event-loop tasks queue up.

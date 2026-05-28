@@ -24,7 +24,7 @@ def _make_http(return_values: list) -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_batch_session_resolves_items():
+async def test_batch_session_resolves_items() -> None:
     http = _make_http([{"id": "1"}, {"id": "2"}])
 
     async with BatchSession(http) as batch:
@@ -38,7 +38,7 @@ async def test_batch_session_resolves_items():
 
 
 @pytest.mark.asyncio
-async def test_batch_session_passes_correct_args_to_http():
+async def test_batch_session_passes_correct_args_to_http() -> None:
     http = _make_http([{}, {}])
 
     async with BatchSession(http) as batch:
@@ -52,7 +52,7 @@ async def test_batch_session_passes_correct_args_to_http():
 
 
 @pytest.mark.asyncio
-async def test_batch_session_empty_does_not_call_http():
+async def test_batch_session_empty_does_not_call_http() -> None:
     http = _make_http([])
 
     async with BatchSession(http) as _batch:
@@ -62,7 +62,7 @@ async def test_batch_session_empty_does_not_call_http():
 
 
 @pytest.mark.asyncio
-async def test_batch_session_splits_into_chunks():
+async def test_batch_session_splits_into_chunks() -> None:
     """When queue exceeds batch_size, multiple POST calls are made."""
     # 3 items with batch_size=2 → 2 POST requests
     http = MagicMock()
@@ -85,7 +85,7 @@ async def test_batch_session_splits_into_chunks():
 
 
 @pytest.mark.asyncio
-async def test_batch_session_item_not_resolved_before_flush():
+async def test_batch_session_item_not_resolved_before_flush() -> None:
     http = _make_http([{}])
     batch = BatchSession(http)
     item = batch.add("company.getById", {"companyId": "1"})
@@ -95,7 +95,7 @@ async def test_batch_session_item_not_resolved_before_flush():
 
 
 @pytest.mark.asyncio
-async def test_batch_session_partial_failure():
+async def test_batch_session_partial_failure() -> None:
     """Items that succeed should resolve; failed items should raise on .result."""
 
     http = MagicMock()
@@ -122,7 +122,7 @@ async def test_batch_session_partial_failure():
 
 
 @pytest.mark.asyncio
-async def test_fetch_many_by_ids_single_chunk():
+async def test_fetch_many_by_ids_single_chunk() -> None:
     http = MagicMock()
     http.post_batch = AsyncMock(return_value=[{"id": "1"}, {"id": "2"}])
 
@@ -136,7 +136,7 @@ async def test_fetch_many_by_ids_single_chunk():
 
 
 @pytest.mark.asyncio
-async def test_fetch_many_by_ids_multiple_chunks():
+async def test_fetch_many_by_ids_multiple_chunks() -> None:
     """IDs exceeding batch_size must be split into concurrent requests."""
     http = MagicMock()
     http.post_batch = AsyncMock(
@@ -155,7 +155,7 @@ async def test_fetch_many_by_ids_multiple_chunks():
 
 
 @pytest.mark.asyncio
-async def test_fetch_many_by_ids_empty():
+async def test_fetch_many_by_ids_empty() -> None:
     http = MagicMock()
     results = await fetch_many_by_ids(http, "company.getById", "companyId", [])
     assert results == []
@@ -167,12 +167,12 @@ async def test_fetch_many_by_ids_empty():
 # ---------------------------------------------------------------------------
 
 
-def test_max_batch_size_constant_is_50():
+def test_max_batch_size_constant_is_50() -> None:
     """The hard-cap constant must match the server's limit."""
     assert MAX_BATCH_SIZE == 50
 
 
-def test_batch_session_clamps_to_max():
+def test_batch_session_clamps_to_max() -> None:
     """BatchSession silently clamps any batch_size > 50 to 50."""
 
     # Even if the caller passes a huge number, the session caps it.
@@ -180,7 +180,7 @@ def test_batch_session_clamps_to_max():
     assert session._batch_size == MAX_BATCH_SIZE
 
 
-def test_batch_session_default_is_50():
+def test_batch_session_default_is_50() -> None:
     """Default batch_size should be the server hard limit."""
 
     session = BatchSession(http=MagicMock())
@@ -188,7 +188,7 @@ def test_batch_session_default_is_50():
 
 
 @pytest.mark.asyncio
-async def test_batch_session_splits_large_queue():
+async def test_batch_session_splits_large_queue() -> None:
     """
     Queuing more than 50 items must produce multiple flush chunks,
     each no larger than MAX_BATCH_SIZE.
@@ -217,7 +217,7 @@ async def test_batch_session_splits_large_queue():
 
 
 @pytest.mark.asyncio
-async def test_http_post_batch_auto_splits_over_50():
+async def test_http_post_batch_auto_splits_over_50() -> None:
     """post_batch() must auto-split > 50 procedures into chunks of ≤ 50."""
 
     BASE = "https://api2.warera.io/trpc"
@@ -248,7 +248,7 @@ async def test_http_post_batch_auto_splits_over_50():
 
 
 @pytest.mark.asyncio
-async def test_http_post_batch_accepts_exactly_50():
+async def test_http_post_batch_accepts_exactly_50() -> None:
     """post_batch() must not raise for exactly 50 procedures."""
 
     BASE = "https://api2.warera.io/trpc"

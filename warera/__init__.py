@@ -175,12 +175,39 @@ def get_client() -> WareraClient:
 
 
 _RESOURCE_NAMES = {
-    "action_log", "article", "battle", "battle_loot_summary", "battle_order", "battle_ranking",
-    "company", "country", "donation", "election", "event", "game_config", "game_stat", "government",
-    "inventory", "item_trading", "mercenary_contract_auction", "mu", "mu_member", "party", "ranking",
-    "region", "round", "search", "tournament", "transaction", "upgrade", "user", "work",
-    "work_offer", "worker"
+    "action_log",
+    "article",
+    "battle",
+    "battle_loot_summary",
+    "battle_order",
+    "battle_ranking",
+    "company",
+    "country",
+    "donation",
+    "election",
+    "event",
+    "game_config",
+    "game_stat",
+    "government",
+    "inventory",
+    "item_trading",
+    "mercenary_contract_auction",
+    "mu",
+    "mu_member",
+    "party",
+    "ranking",
+    "region",
+    "round",
+    "search",
+    "tournament",
+    "transaction",
+    "upgrade",
+    "user",
+    "work",
+    "work_offer",
+    "worker",
 }
+
 
 def __getattr__(name: str) -> typing.Any:
     if name in _RESOURCE_NAMES:

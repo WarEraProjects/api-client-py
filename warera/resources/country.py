@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .._cache import async_memoize
 from ..models.country import Country
 from ._base import BaseResource
 
 if TYPE_CHECKING:
     pass
+
 
 class CountryResource(BaseResource):
     """
@@ -21,13 +21,12 @@ class CountryResource(BaseResource):
         raw = await self._get("country.getCountryById", countryId=country_id)
         return Country.model_validate(raw)
 
-    @async_memoize
     async def get_all(self) -> dict[str, Country]:
         """
         Get all countries.
         Returns a dict keyed by country ID for O(1) lookups.
         """
-        raw = await self._get("country.getAllCountries")
+        raw = await self._get_swr("country.getAllCountries", ttl_seconds=3600)
         if isinstance(raw, dict):
             return {k: Country.model_validate(v) for k, v in raw.items()}
         if isinstance(raw, list):

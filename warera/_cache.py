@@ -8,6 +8,7 @@ from typing_extensions import ParamSpec
 P = ParamSpec("P")
 R = TypeVar("R")
 
+
 def async_memoize(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
     """
     A simple unbounded async memoization decorator.
@@ -25,14 +26,14 @@ def async_memoize(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         except TypeError:
             # If arguments are not hashable (e.g. lists), we bypass the cache.
             return await func(*args, **kwargs)
-            
+
         if key in cache:
             return await cache[key]
-        
+
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
         cache[key] = fut
-        
+
         try:
             result = await func(*args, **kwargs)
             fut.set_result(result)

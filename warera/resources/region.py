@@ -34,7 +34,6 @@ class RegionResource(BaseResource):
         """Fetch multiple regions by ID concurrently using the auto-batcher."""
         import asyncio
 
-        
         futs = [self.get(rid) for rid in region_ids]
         results = await asyncio.gather(*futs, return_exceptions=True)
         return [r if not isinstance(r, BaseException) else None for r in results]

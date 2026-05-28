@@ -19,3 +19,8 @@ class BaseResource:
         """Call a single GET procedure, stripping None values from params."""
         cleaned = {k: v for k, v in params.items() if v is not None}
         return await self._http.get(procedure, cleaned)
+
+    async def _get_swr(self, procedure: str, ttl_seconds: float, **params: Any) -> Any:
+        """Call a single GET procedure through the SWR cache."""
+        cleaned = {k: v for k, v in params.items() if v is not None}
+        return await self._http.get_swr(procedure, cleaned, ttl_seconds)

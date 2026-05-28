@@ -167,7 +167,9 @@ class WareraClient:
         self.action_log = _wrap_resource(self._async_client.action_log)
         self.tournament = _wrap_resource(self._async_client.tournament)
 
-    def batch(self, batch_size: int | None = None, concurrency: int | None = None) -> _SyncBatchSession:
+    def batch(
+        self, batch_size: int | None = None, concurrency: int | None = None
+    ) -> _SyncBatchSession:
         return _SyncBatchSession(self._async_client.batch(batch_size, concurrency))
 
     def close(self) -> None:
@@ -204,12 +206,39 @@ def get_client() -> WareraClient:
 
 
 _RESOURCE_NAMES = {
-    "action_log", "article", "battle", "battle_loot_summary", "battle_order", "battle_ranking",
-    "company", "country", "donation", "election", "event", "game_config", "game_stat", "government",
-    "inventory", "item_trading", "mercenary_contract_auction", "mu", "mu_member", "party", "ranking",
-    "region", "round", "search", "tournament", "transaction", "upgrade", "user", "work",
-    "work_offer", "worker"
+    "action_log",
+    "article",
+    "battle",
+    "battle_loot_summary",
+    "battle_order",
+    "battle_ranking",
+    "company",
+    "country",
+    "donation",
+    "election",
+    "event",
+    "game_config",
+    "game_stat",
+    "government",
+    "inventory",
+    "item_trading",
+    "mercenary_contract_auction",
+    "mu",
+    "mu_member",
+    "party",
+    "ranking",
+    "region",
+    "round",
+    "search",
+    "tournament",
+    "transaction",
+    "upgrade",
+    "user",
+    "work",
+    "work_offer",
+    "worker",
 }
+
 
 def __getattr__(name: str) -> Any:
     if name in _RESOURCE_NAMES:

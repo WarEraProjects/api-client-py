@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import warnings
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime, timedelta, timezone
 from typing import Any, TypeVar
@@ -13,10 +12,8 @@ from .models.common import CursorPage
 """
 Pagination helpers for cursor-based WarEra API endpoints.
 
-Provides the `auto_paginate_pages` engine that powers `auto_paginate=True`.
+Provides the `_auto_paginate_pages` engine that powers `auto_items=True` and `collect_all`.
 """
-
-
 
 
 T = TypeVar("T")
@@ -31,17 +28,18 @@ def _parse_cursor_date(cursor: str) -> datetime | None:
     if not cursor or "|" not in cursor:
         return None
     date_str = cursor.split("|", 1)[0]
-    
+
     # Handle JS Date format: "Wed May 27 2026 05:41:00 GMT+0000 (Coordinated Universal Time)"
     if "GMT" in date_str:
         try:
             from datetime import timezone
+
             clean_str = date_str[:24]
             dt = datetime.strptime(clean_str, "%a %b %d %Y %H:%M:%S")
             return dt.replace(tzinfo=timezone.utc)
         except ValueError:
             pass
-            
+
     try:
         # e.g., "2026-05-27T03:04:15Z" -> Python datetime
         date_str = date_str.replace("Z", "+00:00")
@@ -50,7 +48,7 @@ def _parse_cursor_date(cursor: str) -> datetime | None:
         return None
 
 
-async def auto_paginate_pages(
+async def _auto_paginate_pages(
     fetch_fn: PageFetcher[T],
     max_pages: int | float = float("inf"),
     cursor_end: datetime | str | None = None,
@@ -66,12 +64,6 @@ async def auto_paginate_pages(
         cursor_end: Cutoff date. Stops when the next_cursor is older than this.
         **kwargs:   Extra arguments forwarded to the fetch_fn.
     """
-    warnings.warn(
-        "`auto_paginate=True` is deprecated and will be removed in v0.2.1. "
-        "Use `auto_items=True` instead to stream items directly.",
-        DeprecationWarning,
-        stacklevel=2
-    )
     if isinstance(cursor_end, str):
         cursor_end = cursor_end.replace("Z", "+00:00")
         cursor_end = datetime.fromisoformat(cursor_end)
@@ -98,8 +90,6 @@ async def auto_paginate_pages(
         cursor = page.next_cursor
 
 
-
-
 async def auto_paginate_items(
     fetch_fn: PageFetcher[T],
     max_pages: int | float = float("inf"),
@@ -109,20 +99,21 @@ async def auto_paginate_items(
     """
     Async generator that fetches pages transparently and yields individual items directly.
     """
-    # Temporarily suppress the deprecation warning since this is an internal call
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        async for page in auto_paginate_pages(
-            fetch_fn, max_pages=max_pages, cursor_end=cursor_end, **kwargs
-        ):
-            for item in page.items:
-                yield item
+    async for page in _auto_paginate_pages(
+        fetch_fn, max_pages=max_pages, cursor_end=cursor_end, **kwargs
+    ):
+        for item in page.items:
+            yield item
+
 
 WARERA_EPOCH = datetime(2025, 1, 1, tzinfo=timezone.utc)
 WARERA_MAX_CONCURRENCY = int(os.environ.get("WARERA_MAX_CONCURRENCY", 500))
 
+
 async def parallel_collect_all(
-    fetch_fn: Callable[..., Coroutine[Any, Any, CursorPage[T] | AsyncGenerator[CursorPage[T], None]]],
+    fetch_fn: Callable[
+        ..., Coroutine[Any, Any, CursorPage[T]]
+    ],
     oldest_date: datetime | str | None = None,
     time_slice_days: float = 0.2,
     concurrency: int | None = None,
@@ -143,13 +134,13 @@ async def parallel_collect_all(
 
     while current_end > oldest_date:
         chunk_start = max(oldest_date, current_end - timedelta(days=time_slice_days))
-        
+
         if current_end == now:
             cursor = None
         else:
             iso_str = current_end.strftime("%Y-%m-%dT%H:%M:%S.000Z")
             cursor = f"{iso_str}|000000000000000000000000"
-            
+
         chunks.append((cursor, chunk_start))
         current_end = chunk_start
 
@@ -160,35 +151,22 @@ async def parallel_collect_all(
     async def fetch_chunk(cur: str | None, cur_end: datetime) -> list[T]:
         if abort_event.is_set():
             return []
-            
+
         chunk_items: list[T] = []
         async with sem:
             if abort_event.is_set():
                 return []
-                
-            result = await fetch_fn(
-                auto_paginate=True,
-                cursor=cur,
-                cursor_end=cur_end.isoformat(),
-                **kwargs
+
+            result = _auto_paginate_pages(
+                fetch_fn, cursor=cur, cursor_end=cur_end.isoformat(), **kwargs
             )
-            # Support both AsyncGenerator and returning a CursorPage directly
-            if hasattr(result, "__aiter__"):
-                async for page in result:
-                    chunk_items.extend(page.items)
-                    if not getattr(page, "has_more", True):
-                        abort_event.set()
-            else:
-                # Actually, auto_paginate=True should always return AsyncGenerator,
-                # but if it somehow returns CursorPage, we just handle it.
-                chunk_items.extend(result.items)
-                if not getattr(result, "has_more", True):
+            async for page in result:
+                chunk_items.extend(page.items)
+                if not getattr(page, "has_more", True):
                     abort_event.set()
         return chunk_items
 
-    chunk_results = await asyncio.gather(*[
-        fetch_chunk(c, start) for c, start in chunks
-    ])
+    chunk_results = await asyncio.gather(*[fetch_chunk(c, start) for c, start in chunks])
 
     unique_items: list[T] = []
     seen = set()
@@ -202,7 +180,7 @@ async def parallel_collect_all(
                 # Can not reliably deduplicate, just append
                 unique_items.append(item)
                 continue
-                
+
             if item_id not in seen:
                 seen.add(item_id)
                 unique_items.append(item)
@@ -210,31 +188,7 @@ async def parallel_collect_all(
     # Attempt to sort globally by descending created_at
     with contextlib.suppress(Exception):
         unique_items.sort(
-            key=lambda x: getattr(x, "created_at", getattr(x, "createdAt", "")),
-            reverse=True
+            key=lambda x: getattr(x, "created_at", getattr(x, "createdAt", "")), reverse=True
         )
-        
+
     return unique_items
-
-
-async def paginate_items(
-    fetch_fn: Callable[..., Coroutine[Any, Any, AsyncGenerator[CursorPage[T], None] | CursorPage[T]]],
-    **kwargs: Any,
-) -> AsyncGenerator[T, None]:
-    """
-    A simple wrapper to seamlessly yield individual items from an auto-paginating endpoint.
-    """
-    warnings.warn(
-        "`paginate()` wrapper is deprecated. Use `get_paginated(auto_items=True)` directly.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    kwargs["auto_paginate"] = True
-    result = await fetch_fn(**kwargs)
-    if hasattr(result, "__aiter__"):
-        async for page in result:
-            for item in page.items:
-                yield item
-    else:
-        for item in result.items:
-            yield item

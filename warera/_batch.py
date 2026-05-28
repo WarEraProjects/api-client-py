@@ -99,7 +99,9 @@ class BatchSession:
     concurrent POST requests automatically.
     """
 
-    def __init__(self, http: Any, batch_size: int = DEFAULT_BATCH_SIZE, concurrency: int | None = None) -> None:
+    def __init__(
+        self, http: Any, batch_size: int = DEFAULT_BATCH_SIZE, concurrency: int | None = None
+    ) -> None:
         # `http` is an HttpSession instance — typed as Any to avoid circular import
         self._http = http
         # Clamp to the API hard limit — requests with >50 procedures are rejected.
