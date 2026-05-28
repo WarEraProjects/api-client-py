@@ -1,7 +1,7 @@
 import asyncio
-import time
 
 import pytest
+
 from warera._swr import SWRCache
 
 

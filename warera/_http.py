@@ -32,8 +32,6 @@ import time
 from typing import Any
 from urllib.parse import quote
 
-logger = logging.getLogger("warera.http")
-
 import httpx
 import orjson as _orjson  # ~5-10× faster JSON serialization
 from tenacity import (
@@ -54,6 +52,8 @@ from .exceptions import (
     WareraValidationError,
     _raise_for_status,
 )
+
+logger = logging.getLogger("warera.http")
 
 # Public constant so client.py can import it instead of duplicating the string.
 DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
