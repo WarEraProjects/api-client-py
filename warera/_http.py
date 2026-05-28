@@ -25,16 +25,20 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import random
 import time
 from typing import Any
 from urllib.parse import quote
 
+logger = logging.getLogger("warera.http")
+
 import httpx
 import orjson as _orjson  # ~5-10× faster JSON serialization
 from tenacity import (
     AsyncRetrying,
+    before_sleep_log,
     retry_if_exception,
     stop_after_attempt,
     wait_exponential,
@@ -203,6 +207,7 @@ class _RateLimitState:
                 if wait_secs > 0:
                     jitter = random.uniform(0.01, 0.5)
                     self.total_wait_seconds += wait_secs + jitter
+                    logger.warning(f"Rate limit exhausted. Sleeping for {wait_secs:.2f}s + {jitter:.2f}s jitter...")
                     await asyncio.sleep(wait_secs + jitter)
                 # Reset state — next response will give us fresh values.
                 self.remaining = None
@@ -296,6 +301,7 @@ class HttpSession:
                 min=self._retry_backoff,
                 max=10,
             ),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
             reraise=True,
         )
 
@@ -312,6 +318,7 @@ class HttpSession:
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._auto_batch_queue.append((procedure, params, fut))
+        logger.debug(f"Queuing '{procedure}' for auto-batching (queue size: {len(self._auto_batch_queue)})")
 
         if self._auto_batch_task is None:
             self._auto_batch_task = loop.create_task(self._auto_batch_flush())
@@ -344,6 +351,8 @@ class HttpSession:
 
         if not queue:
             return
+
+        logger.debug(f"Flushing batch of {len(queue)} procedures...")
 
         if len(queue) == 1:
             proc, params, fut = queue[0]

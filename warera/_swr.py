@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar, cast
+
+logger = logging.getLogger("warera.swr")
 
 T = TypeVar("T")
 
@@ -34,13 +37,18 @@ class SWRCache:
         if key in self._cache:
             data, fetch_time = self._cache[key]
             if now - fetch_time > ttl_seconds:
+                logger.debug(f"SWR Cache hit (stale) for '{key}'. Triggering background revalidation.")
                 self._revalidate(key, fetcher)
+            else:
+                logger.debug(f"SWR Cache hit (fresh) for '{key}'.")
             return cast(T, data)
 
         # Not in cache, must block and fetch
         if key in self._inflight:
+            logger.debug(f"SWR Cache miss for '{key}'. Awaiting existing inflight fetch.")
             return cast(T, await self._inflight[key])
 
+        logger.debug(f"SWR Cache miss for '{key}'. Fetching data synchronously.")
         return await self._do_fetch(key, fetcher)
 
     def _revalidate(self, key: str, fetcher: Callable[[], Coroutine[Any, Any, T]]) -> None:
