@@ -4,7 +4,14 @@ from .common import WareraModel
 
 
 class ArticleStats(WareraModel):
-    pass
+    comments: int | None = None
+    dislikes: int | None = None
+    gem_tips: int | None = None
+    likes: int | None = None
+    score: int | None = None
+    subs: int | None = None
+    tips: int | None = None
+    views: int | None = None
 
 
 class Article(WareraModel):
@@ -40,6 +47,7 @@ class ArticleLite(WareraModel):
     score: int | None = None
     views: int | None = None
     image: str | None = None
+    created_at: str | None = None
     author: str | None = None
     content: str | None = None
     is_deleted: bool | None = None
