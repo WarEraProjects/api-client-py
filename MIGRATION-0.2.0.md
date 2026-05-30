@@ -83,3 +83,30 @@ We've introduced complete visibility into the SDK's mechanics (conceptually mirr
 - **Standard Logging**: You can now enable `logging.getLogger("warera").setLevel(logging.DEBUG)` to watch exactly when the engine queues procedures, flushes batches, hits cache (stale vs fresh), and automatically sleeps on rate limits.
 - **Configurable Batch Delays**: `WareraClient` now accepts an `auto_batch_delay` (default: 5ms) allowing you to manually tune the batching collection window to your exact requirements.
 - **Event Hooks**: `WareraClient` now exposes `event_hooks={"request": [...], "response": [...]}` which perfectly matches the functionality of tRPC Links, allowing you to inject Prometheus metrics, datadog loggers, or raw JSON debuggers on every network call.
+
+## 7. HTTP Retry Engine with Exponential Backoff
+
+To achieve 100% architectural parity with the TypeScript wrapper's `createRetryFetch`, we've implemented an advanced **HTTP Retry Engine** directly into the core `HttpSession`.
+
+If a request fails due to a transient network error or specific API response codes (`408, 409, 425, 429, 500, 502, 503, 504`), the client will automatically retry the request up to `max_retries` times. It leverages **exponential backoff with uniform random jittering** to prevent thundering herd problems.
+You can completely control this via the `WareraClient` configuration:
+```python
+client = warera.WareraClient(
+    max_retries=3,
+    initial_delay_ms=250,
+    max_delay_ms=5000,
+    backoff_multiplier=2.0,
+    jitter=True
+)
+```
+
+## 8. Strict Typings for `GameConfig`
+
+Previously, static resources returned by `gameConfig.getGameConfig` were lazily mapped to `dict[str, Any]`. We've eliminated this to provide **strict static typings and IDE autocomplete support**!
+Over 75 nested structures (e.g., `GameConfigBadges`, `UpgradeConfigBunkerLevel`, `ItemConcrete`) have been natively generated from the TypeScript `Responses.d.ts` definitions. 
+
+```python
+config = await warera.game_config.get()
+print(config.badge.coffee.gold_cost)  # Fully strictly typed and auto-completable!
+```
+*(Note: If the core game data schemas change in the future, the python auto-generation AST script is safely stored in `/scratch/extract_game_config.py` for immediate syncing).*

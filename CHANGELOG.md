@@ -15,6 +15,8 @@
 - **Configurable Auto-Batching Delay**: The internal batch delay is now exposed via `auto_batch_delay` (default: 5ms), matching tRPC's `httpBatchLink` configuration. 
 - **Middleware Event Hooks**: Exposes native `httpx` event hooks (`event_hooks={"request": [...], "response": [...]}`), acting identically to tRPC Links for custom telemetry injection.
 - **Connection Resilience**: Increased default `httpx` timeout from 10s to 30s to prevent premature read timeouts when the server processes massive batches.
+- **HTTP Retry Engine**: Natively implements the TypeScript wrapper's `createRetryFetch` engine. Automatically intercepts HTTP errors (`408, 409, 425, 429, 500, 502, 503, 504`) and transient network issues with configurable exponential backoff and uniform random jitter to prevent thundering herd bottlenecks.
+- **Strict GameConfig Typing**: Over 75+ nested structures inside `gameConfig.getGameConfig` have been strictly typed (e.g. `GameConfigBadges`, `UpgradeConfigBunkerLevel`). The Pydantic schemas were machine-generated directly from the official TS AST to provide absolute 100% architectural schema parity, dropping the unsafe `dict[str, Any]` typings entirely.
 
 For full details on migrating your code from `v0.1.x`, see the [v0.2.0 Migration Guide](MIGRATION-0.2.0.md).
 

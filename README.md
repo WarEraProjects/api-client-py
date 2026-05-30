@@ -678,7 +678,10 @@ WareraClient(
     base_url: str = "https://api2.warera.io/trpc",
     timeout: float = 30.0,             # HTTP request timeout in seconds
     max_retries: int = 3,              # retry attempts for 429 / 5xx errors
-    retry_backoff_factor: float = 0.5, # exponential backoff multiplier
+    initial_delay_ms: int = 250,       # initial retry delay in ms
+    max_delay_ms: int = 5000,          # max retry delay in ms
+    backoff_multiplier: float = 2.0,   # exponential backoff multiplier
+    jitter: bool = True,               # add random jitter to delays
     batch_size: int = 50,              # max procedures per batch POST chunk
                                        # values above 50 are silently clamped
                                        # to the server's hard limit
