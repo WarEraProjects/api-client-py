@@ -239,6 +239,7 @@ class HttpSession:
         jitter: bool = True,
         auto_batch_delay: float = 0.005,
         event_hooks: dict[str, list[Any]] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         # Resolve API key: explicit arg > env var > None
         self._api_key: str | None = api_key or os.environ.get(_ENV_KEY)
@@ -254,7 +255,8 @@ class HttpSession:
         self._auto_batch_queue: list[tuple[str, dict[str, Any], asyncio.Future[Any]]] = []
         self._auto_batch_task: asyncio.Task[None] | None = None
         self._auto_batch_delay = auto_batch_delay
-        self._event_hooks = event_hooks
+        self._event_hooks = event_hooks or {}
+        self._custom_headers = headers or {}
         self._swr_cache = SWRCache()
 
     # ------------------------------------------------------------------
@@ -273,7 +275,7 @@ class HttpSession:
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
                 timeout=self._timeout,
-                headers={"User-Agent": "warera-client", "rt": _RT_HEADER},
+                headers={"User-Agent": "warera-client", "rt": _RT_HEADER, **self._custom_headers},
                 follow_redirects=True,
                 http2=True,
                 limits=httpx.Limits(max_connections=200, max_keepalive_connections=50),

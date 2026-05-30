@@ -119,6 +119,7 @@ class WareraClient:
         concurrency: int | None = None,
         auto_batch_delay: float = 0.005,
         event_hooks: dict[str, list[Any]] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """
         Args:
@@ -138,6 +139,7 @@ class WareraClient:
                                   before flushing the batch (aligns with tRPC httpBatchLink).
             event_hooks:          Dictionary mapping 'request' or 'response' to a list of
                                   async hook functions (aligns with tRPC Links/Middleware).
+            headers:              Additional custom HTTP headers to send with every request.
         """
         self._http = HttpSession(
             api_key=api_key,
@@ -150,6 +152,7 @@ class WareraClient:
             jitter=jitter,
             auto_batch_delay=auto_batch_delay,
             event_hooks=event_hooks,
+            headers=headers,
         )
         # Clamp to server hard limit — the API rejects batches > 50 procedures.
         self._batch_size = min(batch_size, MAX_BATCH_SIZE)

@@ -148,27 +148,6 @@ class WorkOfferResource(BaseResource):
                     )
                 },
             )
-        if auto_items:
-            from .._pagination import auto_paginate_items
-
-            return auto_paginate_items(
-                self.get_paginated,
-                max_pages=max_pages,
-                cursor_end=cursor_end,
-                **{
-                    k: v
-                    for k, v in locals().items()
-                    if k
-                    not in (
-                        "self",
-                        "auto_paginate",
-                        "auto_items",
-                        "max_pages",
-                        "cursor_end",
-                        "kwargs",
-                    )
-                },
-            )
 
         raw = await self._get(
             "workOffer.getWorkOffersPaginated",
