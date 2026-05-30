@@ -40,6 +40,7 @@ from tenacity import (
     retry_if_exception,
     stop_after_attempt,
     wait_exponential,
+    wait_random_exponential,
 )
 
 from ._swr import SWRCache
@@ -83,8 +84,12 @@ _RT_HEADER = _get_rt_header()
 
 
 def _is_retryable(exc: BaseException) -> bool:
-    """Retry on rate-limit errors, server errors, and network errors."""
-    return isinstance(exc, (WareraRateLimitError, WareraServerError, httpx.TransportError))
+    """Retry on specific status codes and network errors."""
+    if isinstance(exc, httpx.TransportError):
+        return True
+    if isinstance(exc, WareraHTTPError):
+        return exc.status_code in {408, 409, 425, 429, 500, 502, 503, 504}
+    return False
 
 
 class _RateLimitState:
@@ -229,7 +234,10 @@ class HttpSession:
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = 30.0,
         max_retries: int = 3,
-        retry_backoff_factor: float = 0.5,
+        initial_delay_ms: int = 250,
+        max_delay_ms: int = 5000,
+        backoff_multiplier: float = 2.0,
+        jitter: bool = True,
         auto_batch_delay: float = 0.005,
         event_hooks: dict[str, list[Any]] | None = None,
     ) -> None:
@@ -238,7 +246,10 @@ class HttpSession:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._max_retries = max_retries
-        self._retry_backoff = retry_backoff_factor
+        self._initial_delay = initial_delay_ms / 1000.0
+        self._max_delay = max_delay_ms / 1000.0
+        self._backoff_multiplier = backoff_multiplier
+        self._jitter = jitter
         self._client: httpx.AsyncClient | None = None
         self._rate_limit = _RateLimitState()
         self._auto_batch_queue: list[tuple[str, dict[str, Any], asyncio.Future[Any]]] = []
@@ -298,13 +309,14 @@ class HttpSession:
 
     def _retrying(self) -> AsyncRetrying:
         """Return a new AsyncRetrying instance configured from this session's params."""
+        wait_cls = wait_random_exponential if self._jitter else wait_exponential
         return AsyncRetrying(
             retry=retry_if_exception(_is_retryable),
-            stop=stop_after_attempt(self._max_retries),
-            wait=wait_exponential(
-                multiplier=self._retry_backoff,
-                min=self._retry_backoff,
-                max=10,
+            stop=stop_after_attempt(self._max_retries + 1),
+            wait=wait_cls(
+                multiplier=self._initial_delay,
+                exp_base=self._backoff_multiplier,
+                max=self._max_delay,
             ),
             before_sleep=before_sleep_log(logger, logging.WARNING),
             reraise=True,

@@ -111,7 +111,10 @@ class WareraClient:
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = 30.0,
         max_retries: int = 3,
-        retry_backoff_factor: float = 0.5,
+        initial_delay_ms: int = 250,
+        max_delay_ms: int = 5000,
+        backoff_multiplier: float = 2.0,
+        jitter: bool = True,
         batch_size: int = 50,
         concurrency: int | None = None,
         auto_batch_delay: float = 0.005,
@@ -125,7 +128,10 @@ class WareraClient:
             base_url:             Override the API base URL (useful for testing).
             timeout:              HTTP request timeout in seconds.
             max_retries:          Max retry attempts for 429 / 5xx errors.
-            retry_backoff_factor: Multiplier for exponential backoff between retries.
+            initial_delay_ms:     Initial retry delay in milliseconds (default: 250).
+            max_delay_ms:         Maximum retry delay in milliseconds (default: 5000).
+            backoff_multiplier:   Multiplier for exponential backoff (default: 2.0).
+            jitter:               Whether to add random jitter to retry delays (default: True).
             batch_size:           Default max procedures per batch POST.
             concurrency:          Default max concurrent chunk POSTs per batch flush.
             auto_batch_delay:     Wait time (in seconds) to accumulate concurrent requests
@@ -138,7 +144,10 @@ class WareraClient:
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
-            retry_backoff_factor=retry_backoff_factor,
+            initial_delay_ms=initial_delay_ms,
+            max_delay_ms=max_delay_ms,
+            backoff_multiplier=backoff_multiplier,
+            jitter=jitter,
             auto_batch_delay=auto_batch_delay,
             event_hooks=event_hooks,
         )
