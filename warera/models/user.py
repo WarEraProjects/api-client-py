@@ -171,6 +171,6 @@ class User(UserLite):
     company: str | None = None
     mu_max_level_rewarded: int | None = None
     available_color_schemes: list[str] | None = None
-    equipped_skin_keys: dict[str, Any] | None = None
-    finished_tours: dict[str, Any] | None = None
+    equipped_skin_keys: dict[str, Any] | list[str] | None = None
+    finished_tours: dict[str, Any] | list[Any] | None = None
     should_update_profile: bool | None = None
