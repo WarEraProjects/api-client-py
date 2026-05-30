@@ -49,7 +49,6 @@ from .exceptions import (
     WareraError,
     WareraHTTPError,
     WareraRateLimitError,
-    WareraServerError,
     WareraValidationError,
     _raise_for_status,
 )
@@ -256,8 +255,6 @@ class HttpSession:
         self._auto_batch_task: asyncio.Task[None] | None = None
         self._auto_batch_delay = auto_batch_delay
         self._event_hooks = event_hooks
-        # Cache the retry config so we don't rebuild it on every request.
-        self._retry_config: AsyncRetrying | None = None
         self._swr_cache = SWRCache()
 
     # ------------------------------------------------------------------
@@ -302,9 +299,9 @@ class HttpSession:
         return {}
 
     # ------------------------------------------------------------------
-    # Retry helper — built at call time so max_retries / retry_backoff_factor
-    # are actually honoured instead of being silently ignored by a static
-    # @retry decorator with hardcoded values.
+    # Retry helper — built at call time so max_retries / backoff_multiplier /
+    # jitter are actually honoured instead of being silently ignored by a
+    # static @retry decorator with hardcoded values.
     # ------------------------------------------------------------------
 
     def _retrying(self) -> AsyncRetrying:

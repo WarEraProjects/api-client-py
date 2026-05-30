@@ -107,6 +107,6 @@ Over 75 nested structures (e.g., `GameConfigBadges`, `UpgradeConfigBunkerLevel`,
 
 ```python
 config = await warera.game_config.get()
-print(config.badge.coffee.gold_cost)  # Fully strictly typed and auto-completable!
+print(config.badge.coffee.reward)  # Fully strictly typed and auto-completable!
 ```
-*(Note: If the core game data schemas change in the future, the python auto-generation AST script is safely stored in `/scratch/extract_game_config.py` for immediate syncing).*
+*(Note: If the core game data schemas change in the future, the python auto-generation script is maintained separately outside the repository for immediate syncing).*
