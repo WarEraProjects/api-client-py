@@ -865,4 +865,3 @@ class GameDates(WareraModel):
     game_year: int | None = Field(default=None, alias="gameYear")
     real_date: str | None = Field(default=None, alias="realDate")
     day_duration_seconds: int | None = Field(default=None, alias="dayDurationSeconds")
-GameConfig.model_rebuild()

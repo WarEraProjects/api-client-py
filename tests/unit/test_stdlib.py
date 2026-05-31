@@ -150,9 +150,8 @@ class TestEnums(unittest.TestCase):
         self.assertIn("yourCountry", [e.value for e in BattleFilter])
         self.assertIn("yourEnemies", [e.value for e in BattleFilter])
 
-    def test_ranking_type_has_26_values(self):
-        # 9 country + 12 user + 5 MU = 26
-        self.assertEqual(len(RankingType), 26)
+    def test_ranking_type_has_33_values(self):
+        self.assertEqual(len(RankingType), 33)
 
     def test_event_type_has_21_values(self):
         self.assertEqual(len(EventType), 21)

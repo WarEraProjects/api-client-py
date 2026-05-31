@@ -56,7 +56,7 @@ from .exceptions import (
 logger = logging.getLogger("warera.http")
 
 # Public constant so client.py can import it instead of duplicating the string.
-DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
+DEFAULT_BASE_URL = "https://apidev.warera.io/trpc"
 _ENV_KEY = "WARERA_API_KEY"
 
 
