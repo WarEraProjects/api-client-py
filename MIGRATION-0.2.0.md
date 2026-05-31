@@ -96,7 +96,9 @@ client = warera.WareraClient(
     initial_delay_ms=250,
     max_delay_ms=5000,
     backoff_multiplier=2.0,
-    jitter=True
+    jitter=True,
+    retryable_status_codes={408, 409, 425, 429, 500, 502, 503, 504}, # Customize which errors trigger a retry
+    headers={"X-My-Proxy": "1"} # You can now also inject custom headers globally!
 )
 ```
 
@@ -109,4 +111,3 @@ Over 75 nested structures (e.g., `GameConfigBadges`, `UpgradeConfigBunkerLevel`,
 config = await warera.game_config.get()
 print(config.badge.coffee.reward)  # Fully strictly typed and auto-completable!
 ```
-*(Note: If the core game data schemas change in the future, the python auto-generation script is maintained separately outside the repository for immediate syncing).*

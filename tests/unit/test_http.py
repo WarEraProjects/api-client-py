@@ -369,3 +369,32 @@ async def test_http_session_updates_rate_limit_from_response():
 
     assert session._rate_limit.limit == 500
     assert session._rate_limit.remaining == 400
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_http_session_retries_on_5xx():
+    """HttpSession should retry 5xx errors according to max_retries."""
+    call_count = 0
+
+    def side_effect(request):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            return httpx.Response(503, json=_make_trpc_error(-32000, "Service Unavailable"))
+        return httpx.Response(200, json=_make_trpc_ok({"success": True}))
+
+    respx.get(url__startswith=BASE).mock(side_effect=side_effect)
+
+    # Use a small delay for tests
+    async with HttpSession(
+        base_url=BASE,
+        max_retries=3,
+        initial_delay_ms=1,
+        max_delay_ms=10
+    ) as session:
+        res = await session.get("test.endpoint", {})
+
+    assert call_count == 3
+    assert res == {"success": True}
+

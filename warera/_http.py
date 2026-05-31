@@ -82,13 +82,7 @@ def _get_rt_header() -> str:
 _RT_HEADER = _get_rt_header()
 
 
-def _is_retryable(exc: BaseException) -> bool:
-    """Retry on specific status codes and network errors."""
-    if isinstance(exc, httpx.TransportError):
-        return True
-    if isinstance(exc, WareraHTTPError):
-        return exc.status_code in {408, 409, 425, 429, 500, 502, 503, 504}
-    return False
+# Moved into HttpSession as an instance method.
 
 
 class _RateLimitState:
@@ -240,6 +234,7 @@ class HttpSession:
         auto_batch_delay: float = 0.005,
         event_hooks: dict[str, list[Any]] | None = None,
         headers: dict[str, str] | None = None,
+        retryable_status_codes: set[int] | list[int] | tuple[int, ...] | None = None,
     ) -> None:
         # Resolve API key: explicit arg > env var > None
         self._api_key: str | None = api_key or os.environ.get(_ENV_KEY)
@@ -258,6 +253,18 @@ class HttpSession:
         self._event_hooks = event_hooks or {}
         self._custom_headers = headers or {}
         self._swr_cache = SWRCache()
+        self._retryable_status_codes = frozenset(
+            retryable_status_codes if retryable_status_codes is not None 
+            else {408, 409, 425, 429, 500, 502, 503, 504}
+        )
+
+    def _is_retryable(self, exc: BaseException) -> bool:
+        """Retry on specific status codes and network errors."""
+        if isinstance(exc, httpx.TransportError):
+            return True
+        if isinstance(exc, WareraHTTPError):
+            return exc.status_code in self._retryable_status_codes
+        return False
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -310,14 +317,14 @@ class HttpSession:
         """Return a new AsyncRetrying instance configured from this session's params."""
         wait_cls = wait_random_exponential if self._jitter else wait_exponential
         return AsyncRetrying(
-            retry=retry_if_exception(_is_retryable),
+            retry=retry_if_exception(self._is_retryable),
             stop=stop_after_attempt(self._max_retries + 1),
             wait=wait_cls(
                 multiplier=self._initial_delay,
                 exp_base=self._backoff_multiplier,
                 max=self._max_delay,
             ),
-            before_sleep=before_sleep_log(logger, logging.WARNING),
+            before_sleep=before_sleep_log(logger, logging.DEBUG),
             reraise=True,
         )
 

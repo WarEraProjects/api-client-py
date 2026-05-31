@@ -115,6 +115,7 @@ class WareraClient:
         max_delay_ms: int = 5000,
         backoff_multiplier: float = 2.0,
         jitter: bool = True,
+        retryable_status_codes: set[int] | list[int] | tuple[int, ...] | None = None,
         batch_size: int = 50,
         concurrency: int | None = None,
         auto_batch_delay: float = 0.005,
@@ -133,6 +134,7 @@ class WareraClient:
             max_delay_ms:         Maximum retry delay in milliseconds (default: 5000).
             backoff_multiplier:   Multiplier for exponential backoff (default: 2.0).
             jitter:               Whether to add random jitter to retry delays (default: True).
+            retryable_status_codes: Custom set of HTTP status codes to retry on (default: 408, 409, 425, 429, 50x).
             batch_size:           Default max procedures per batch POST.
             concurrency:          Default max concurrent chunk POSTs per batch flush.
             auto_batch_delay:     Wait time (in seconds) to accumulate concurrent requests
@@ -150,6 +152,7 @@ class WareraClient:
             max_delay_ms=max_delay_ms,
             backoff_multiplier=backoff_multiplier,
             jitter=jitter,
+            retryable_status_codes=retryable_status_codes,
             auto_batch_delay=auto_batch_delay,
             event_hooks=event_hooks,
             headers=headers,

@@ -687,6 +687,8 @@ WareraClient(
                                        # to the server's hard limit
     auto_batch_delay: float = 0.005,   # wait time in seconds to accumulate batch chunks
     event_hooks: dict | None = None,   # dict mapping 'request'/'response' to async hooks
+    headers: dict | None = None,       # additional custom HTTP headers to send
+    retryable_status_codes: set | None = None, # custom HTTP status codes to trigger retry
 )
 
 # You can also configure the extreme maximum concurrency for massive bulk fetching operations 
@@ -745,5 +747,5 @@ MIT
 
 - **Bipin Krishnan (`bipinkrish` / `Bipin`)**: Initial architecture, core client implementation, rate-limiting foundations, and testing frameworks.
 - **PAIN (`PAIN「ᴀᴋᴀᴛsᴜᴋɪ」` / `CrucifiedPain`)**: Comprehensive expansion of Pydantic schemas, API parity updates, documentation overhauls, and feature additions.
-- **[WarEraProjects](https://github.com/wareraprojects/trpc)**: Instrumental in reverse-engineering undocumented API endpoints and the batch-request wire protocol.
+- **[WarEraProjects](https://github.com/wareraprojects)**: Massive credit to the official TypeScript Wrapper (`@wareraprojects/api`) team for providing the foundational schemas and reverse-engineering the underlying tRPC batching protocols.
 - **[Kore-rep](https://github.com/Kore-rep)**: Suggested the implementation of the adaptive rate-limiting engine.

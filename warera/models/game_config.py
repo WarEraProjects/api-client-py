@@ -1,8 +1,8 @@
 """
 Strict game-configuration models.
 
-Auto-generated from the TypeScript wrapper's ``Responses.d.ts``.
-Do not edit by hand — re-run ``extract_game_config.py`` instead.
+Auto-generated from WarEra TypeScript responses.
+Do not edit by hand.
 """
 from __future__ import annotations
 
@@ -487,9 +487,9 @@ class GameConfigReferral(WareraModel):
     money_for_being_referred: float | None = Field(default=None, alias="moneyForBeingReferred")
 
 class RegionResourceBonusByTier(WareraModel):
-    val_1: int | None = Field(default=None, alias="1")
-    val_2: int | None = Field(default=None, alias="2")
-    val_3: int | None = Field(default=None, alias="3")
+    val_1: float | None = Field(default=None, alias="1")
+    val_2: float | None = Field(default=None, alias="2")
+    val_3: float | None = Field(default=None, alias="3")
 
 class GameConfigRegion(WareraModel):
     battle_cooldown_hours: int | None = Field(default=None, alias="battleCooldownHours")
@@ -514,8 +514,8 @@ class GameConfigRegion(WareraModel):
     resistance_contribution_value: float | None = Field(default=None, alias="resistanceContributionValue")
     resistance_decay_percent: float | None = Field(default=None, alias="resistanceDecayPercent")
     resistance_foreign_gov_cost_multiplier: float | None = Field(default=None, alias="resistanceForeignGovCostMultiplier")
-    resistance_growth_percent_max: int | None = Field(default=None, alias="resistanceGrowthPercentMax")
-    resistance_growth_percent_min: int | None = Field(default=None, alias="resistanceGrowthPercentMin")
+    resistance_growth_percent_max: float | None = Field(default=None, alias="resistanceGrowthPercentMax")
+    resistance_growth_percent_min: float | None = Field(default=None, alias="resistanceGrowthPercentMin")
     resistance_passive_growth_percent: float | None = Field(default=None, alias="resistancePassiveGrowthPercent")
     resources_bonus: RegionResourceBonusByTier | None = Field(default=None, alias="resourcesBonus")
     transfer_days_cooldown: int | None = Field(default=None, alias="transferDaysCooldown")
@@ -865,3 +865,4 @@ class GameDates(WareraModel):
     game_year: int | None = Field(default=None, alias="gameYear")
     real_date: str | None = Field(default=None, alias="realDate")
     day_duration_seconds: int | None = Field(default=None, alias="dayDurationSeconds")
+GameConfig.model_rebuild()
