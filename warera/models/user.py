@@ -97,6 +97,7 @@ class RankingDetail(WareraModel):
     value: float | None = None
     rank: int | None = None
     tier: str | None = None
+    country: str | None = None
 
 
 class UserRankings(WareraModel):
@@ -128,6 +129,7 @@ class UserMissionsClaimedAt(WareraModel):
     starting: str | None = None
     daily: str | None = None
     weekly: str | None = None
+    monthly: str | None = None
 
 
 class UserMissions(WareraModel):
@@ -137,7 +139,13 @@ class UserMissions(WareraModel):
 
 
 class UserInfos(WareraModel):
-    pass
+    color_scheme: str | None = None
+    description: str | None = None
+    font: str | None = None
+    is_premium: bool | None = None
+    premium_gifts_count: int | None = None
+    premium_months_count: int | None = None
+    vice_president_of: str | None = None
 
 
 class UserLite(WareraModel):
@@ -169,6 +177,6 @@ class User(UserLite):
     company: str | None = None
     mu_max_level_rewarded: int | None = None
     available_color_schemes: list[str] | None = None
-    equipped_skin_keys: list[str] | None = None
-    finished_tours: list[str] | None = None
+    equipped_skin_keys: dict[str, str] | None = None
+    finished_tours: dict[str, bool] | None = None
     should_update_profile: bool | None = None

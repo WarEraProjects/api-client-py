@@ -5,12 +5,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > A robust, fully-typed, async-first Python client for the [WarEra](https://warera.io) tRPC API (v0.24.5-beta).
-
+> 
+> **⚠️ Upgrading from v0.1.x?** Please read the [v0.2.0 Migration Guide](MIGRATION-0.2.0.md).
+> 
 ```python
-async with WareraClient(api_key="YOUR_KEY") as client:
-    user   = await client.user.get_by_id("12345")
-    prices = await client.item_trading.get_prices()
-    gov    = await client.government.get("7")
+import warera
+
+async def main():
+    user   = await warera.user.get_by_id("12345")
+    prices = await warera.item_trading.get_prices()
+    gov    = await warera.government.get("7")
 ```
 
 ## Features
@@ -18,7 +22,7 @@ async with WareraClient(api_key="YOUR_KEY") as client:
 - **Full API coverage** — all endpoints across 32 resource namespaces.
 - **Fully Typed** — Pydantic v2 models for *every* request and response.
 - **Async-first** — built on `httpx.AsyncClient`; sync shim included.
-- **Cursor pagination** — transparent `paginate()` generator and `collect_all()` helper.
+- **Cursor pagination** — transparent `auto_items=True` generator and `collect_all()` time-slicing engine.
 - **Batch requests** — `BatchSession` for multiple procedures in one HTTP round-trip; auto-chunked `get_many` for ID lists.
 - **Smart batch splitting** — any batch larger than the server's hard limit of 50 is automatically split and fired concurrently; no manual chunking needed.
 - **Adaptive rate limiting** — reads `ratelimit-remaining` / `ratelimit-reset` response headers and sleeps exactly as long as the server says.
@@ -41,24 +45,25 @@ Requires Python 3.10+.
 
 ```python
 import asyncio
-from warera import WareraClient
+import warera
+
+# The global module automatically reads WARERA_API_KEY from your environment.
+# You can also manually set it via: warera.set_api_key("YOUR_KEY")
 
 async def main():
-    # API key is optional - also reads WARERA_API_KEY env var
-    async with WareraClient(api_key="YOUR_KEY") as client:
+    # Simple lookups
+    user    = await warera.user.get_by_id("12345")
+    country = await warera.country.find_by_name("Ukraine")
+    gov     = await warera.government.get(country.id)
+    prices  = await warera.item_trading.get_prices()
 
-        # Simple lookups
-        user    = await client.user.get_by_id("12345")
-        country = await client.country.find_by_name("Ukraine")
-        gov     = await client.government.get(country.id)
-        prices  = await client.item_trading.get_prices()
+    print(user.username, country.name)
+    print(f"Iron: {prices.get('iron').price}")
 
-        print(user.username, country.name)
-        print(f"Iron: {prices.get('iron').price}")
-
-        # Paginated - stream all users in a country
-        async for u in client.user.paginate_by_country(country.id, limit=50):
-            print(u.username)
+    # Paginated
+    page = await warera.user.get_paginated(country_id=country.id, limit=50)
+    for u in page.items:
+        print(u.username)
 
 asyncio.run(main())
 ```
@@ -66,12 +71,12 @@ asyncio.run(main())
 ### Sync
 
 ```python
-from warera.sync import WareraClient
+import warera.sync
 
-client = WareraClient(api_key="YOUR_KEY")
-user    = client.user.get_by_id("12345")
-prices  = client.item_trading.get_prices()
-battles = client.battle.get_active()   # collects all pages automatically
+warera.sync.set_api_key("YOUR_KEY")
+
+user    = warera.sync.user.get_by_id("12345")
+prices  = warera.sync.item_trading.get_prices()
 ```
 
 ---
@@ -120,9 +125,9 @@ Each section follows this layout: **method signatures** → **enums** (if any) �
 ```python
 await client.user.get_by_id(user_id: str) -> User
 await client.user.get_by_country(country_id, *, limit=10, cursor=None) -> CursorPage[User]
-await client.user.paginate_by_country(country_id, **kwargs)            # async generator
+await client.user.get_by_country(country_id, *, limit=10, cursor=None, auto_items=True) # async generator
 await client.user.collect_by_country(country_id, **kwargs) -> list[User]
-await client.user.get_many(user_ids: list[str], batch_size=50) -> list[User]
+await client.user.get_many(user_ids: list[str]) -> list[User]
 ```
 
 ### `client.company`
@@ -131,8 +136,8 @@ await client.user.get_many(user_ids: list[str], batch_size=50) -> list[User]
 await client.company.get(company_id: str) -> Company
 await client.company.get_companies(*, user_id=None, per_page=10, cursor=None) -> CursorPage[Company]
 await client.company.get_by_user(user_id, **kwargs) -> list[Company]
-await client.company.paginate(**kwargs)                                 # async generator
-await client.company.get_many(company_ids: list[str], batch_size=50) -> list[Company]
+await client.company.get_companies(auto_items=True, **kwargs)                           # async generator
+await client.company.get_many(company_ids: list[str]) -> list[Company]
 await client.company.get_recommended_regions(item_code, *, include_deposit=True) -> list[RecommendedRegion]
 await client.company.get_production_bonus(company_id: str) -> CompanyProductionBonus
 ```
@@ -176,7 +181,7 @@ await client.party.get(party_id: str) -> Party
 await client.party.get_paginated(*, country_id=None, limit=20, cursor=None, direction=None) -> CursorPage[Party]
 await client.party.get_by_country(country_id: str) -> list[Party]
 await client.party.collect_all(**kwargs) -> list[Party]
-await client.party.paginate(**kwargs)                              # async generator
+await client.party.get_paginated(auto_items=True, **kwargs)                        # async generator
 ```
 
 <details><summary><b><code>Party</code></b> fields</summary>
@@ -200,7 +205,7 @@ await client.donation.get_paginated(*, mu_id=None, country_id=None, party_id=Non
     limit=20, cursor=None, direction=None) -> CursorPage[Donation]
 await client.donation.get_totals(*, mu_id=None, country_id=None, party_id=None) -> DonationTotals
 await client.donation.collect_all(**kwargs) -> list[Donation]
-await client.donation.paginate(**kwargs)                           # async generator
+await client.donation.get_paginated(auto_items=True, **kwargs)                     # async generator
 ```
 
 <details><summary><b><code>DonationTotals</code></b> fields</summary>
@@ -218,7 +223,7 @@ print(f"{totals.donor_count} donors, {totals.total_amount} total")
 await client.election.get_paginated(*, country_id=None, limit=20, cursor=None, direction=None) -> CursorPage[Election]
 await client.election.get_by_country(country_id: str) -> list[Election]
 await client.election.collect_all(**kwargs) -> list[Election]
-await client.election.paginate(**kwargs)                           # async generator
+await client.election.get_paginated(auto_items=True, **kwargs)                     # async generator
 ```
 
 <details><summary><b><code>Election</code></b> fields</summary>
@@ -302,7 +307,7 @@ await client.battle.get_live(battle_id, *, round_number=None) -> BattleLive
 await client.battle.get_many(*, is_active=None, limit=10, cursor=None, direction=None,
     filter=None, defender_region_id=None, war_id=None, country_id=None) -> CursorPage[Battle]
 await client.battle.get_active(**kwargs) -> list[Battle]
-await client.battle.paginate(**kwargs)                             # async generator
+await client.battle.get_many(auto_items=True, **kwargs)                            # async generator
 ```
 
 `BattleFilter` - `ALL` `YOUR_COUNTRY` `YOUR_ENEMIES`
@@ -347,7 +352,7 @@ await client.round.get_many(round_ids: list[str], batch_size=50) -> list[Round]
 ```python
 await client.event.get_paginated(*, limit=10, cursor=None,
     country_id=None, event_types=None) -> CursorPage[Event]
-await client.event.paginate(**kwargs)                              # async generator
+await client.event.get_paginated(auto_items=True, **kwargs)                          # async generator
 await client.event.collect_all(**kwargs) -> list[Event]
 ```
 
@@ -389,7 +394,7 @@ await client.work_offer.get(work_offer_id: str) -> WorkOffer
 await client.work_offer.get_by_company(company_id: str) -> list[WorkOffer]
 await client.work_offer.get_paginated(*, limit=10, cursor=None, user_id=None,
     region_id=None, energy=None, production=None, citizenship=None) -> CursorPage[WorkOffer]
-await client.work_offer.paginate(**kwargs)                         # async generator
+await client.work_offer.get_paginated(auto_items=True, **kwargs)                     # async generator
 await client.work_offer.collect_all(**kwargs) -> list[WorkOffer]
 await client.work_offer.get_wage_stats(*, energy, production, citizenship) -> WageStats
 ```
@@ -421,7 +426,7 @@ await client.worker.get_total_count(user_id: str) -> int
 await client.mu.get(mu_id: str) -> MilitaryUnit
 await client.mu.get_paginated(*, limit=20, cursor=None, member_id=None,
     user_id=None, search=None) -> CursorPage[MilitaryUnit]
-await client.mu.paginate(**kwargs)                                 # async generator
+await client.mu.get_paginated(auto_items=True, **kwargs)                             # async generator
 await client.mu.collect_all(**kwargs) -> list[MilitaryUnit]
 await client.mu.get_many(mu_ids: list[str], batch_size=50) -> list[MilitaryUnit]
 ```
@@ -434,13 +439,14 @@ await client.mu.get_many(mu_ids: list[str], batch_size=50) -> list[MilitaryUnit]
 await client.ranking.get(ranking_type: RankingType) -> list[RankingEntry]
 ```
 
-`RankingType` - 26 values:
+`RankingType` - 33 values:
 
 | Category | Values |
 |---|---|
 | Country | `WEEKLY_COUNTRY_DAMAGES` `WEEKLY_COUNTRY_DAMAGES_PER_CITIZEN` `COUNTRY_REGION_DIFF` `COUNTRY_DEVELOPMENT` `COUNTRY_ACTIVE_POPULATION` `COUNTRY_DAMAGES` `COUNTRY_WEALTH` `COUNTRY_PRODUCTION_BONUS` `COUNTRY_BOUNTY` |
 | User | `WEEKLY_USER_DAMAGES` `USER_DAMAGES` `USER_WEALTH` `USER_LEVEL` `USER_REFERRALS` `USER_SUBSCRIBERS` `USER_TERRAIN` `USER_PREMIUM_MONTHS` `USER_PREMIUM_GIFTS` `USER_CASES_OPENED` `USER_GEMS_PURCHASED` `USER_BOUNTY` |
-| MU | `MU_WEEKLY_DAMAGES` `MU_DAMAGES` `MU_TERRAIN` `MU_WEALTH` `MU_BOUNTY` |
+| MU | `MU_WEEKLY_DAMAGES` `MU_DAMAGES` `MU_TERRAIN` `MU_WEALTH` `MU_BOUNTY` `MU_REPUTATION` |
+| Alliance | `ALLIANCE_INITIAL_DEVELOPMENT` `ALLIANCE_DEVELOPMENT` `ALLIANCE_WEEKLY_DAMAGES` `ALLIANCE_DAMAGES` `ALLIANCE_POPULATION` `ALLIANCE_WEEKLY_DAMAGES_PER_CITIZEN` |
 
 ### `client.transaction`
 
@@ -450,7 +456,7 @@ await client.transaction.get_paginated(*, limit=10, cursor=None,
     item_code=None,
     transaction_type: TransactionType | list[TransactionType] | None = None
 ) -> CursorPage[Transaction]
-await client.transaction.paginate(**kwargs)                        # async generator
+await client.transaction.get_paginated(auto_items=True, **kwargs)                    # async generator
 await client.transaction.collect_all(**kwargs) -> list[Transaction]
 ```
 
@@ -473,7 +479,7 @@ await client.article.get_lite(article_id: str) -> ArticleLite
 await client.article.get_paginated(type: ArticleType, *, limit=10, cursor=None,
     user_id=None, categories=None, languages=None,
     positive_score_only=None) -> CursorPage[ArticleLite]
-await client.article.paginate(type, **kwargs)                      # async generator
+await client.article.get_paginated(type, auto_items=True, **kwargs)                  # async generator
 await client.article.collect_all(type, **kwargs) -> list[ArticleLite]
 ```
 
@@ -507,7 +513,7 @@ await client.action_log.get_many(*, limit=20, cursor=None,
     user_id=None, mu_id=None, country_id=None,
     action_type: ActionLogActionType | None = None
 ) -> CursorPage[ActionLog]
-await client.action_log.paginate(**kwargs)                         # async generator
+await client.action_log.get_many(auto_items=True, **kwargs)                            # async generator
 await client.action_log.get_all(**kwargs) -> list[ActionLog]
 ```
 
@@ -531,7 +537,7 @@ await client.battle_loot_summary.get_by_battle_and_user(battle_id: str, user_id:
 
 ```python
 await client.mercenary_contract_auction.get_paginated_auctions(*, country_id=None, battle_id=None, status=None, limit=10, cursor=None) -> CursorPage[MercenaryContractAuction]
-await client.mercenary_contract_auction.paginate(**kwargs)                         # async generator
+await client.mercenary_contract_auction.get_paginated_auctions(auto_items=True, **kwargs) # async generator
 await client.mercenary_contract_auction.collect_all(**kwargs) -> list[MercenaryContractAuction]
 ```
 
@@ -557,12 +563,14 @@ print(page.next_cursor)  # str | None
 print(page.has_more)     # bool
 
 # 2. Async generator - yields items one by one across all pages
-async for battle in client.battle.paginate(is_active=True):
+async for battle in client.battle.get_many(is_active=True, auto_items=True):
     print(battle.id)
 
-# 3. Collect all pages into a flat list
-all_battles = await client.battle.get_active()
+# 3. Collect all pages into a flat list using the ultra-fast parallel time-slicing engine
+all_battles = await client.battle.collect_all()
 ```
+
+*(Note: The old `paginate()` wrapper and `auto_paginate=True` parameter have been fully removed in 0.2.0).*
 
 ---
 
@@ -669,13 +677,25 @@ except WareraError as e:
 WareraClient(
     api_key: str | None = None,        # also reads WARERA_API_KEY env var
     base_url: str = "https://api2.warera.io/trpc",
-    timeout: float = 10.0,             # HTTP request timeout in seconds
+    timeout: float = 30.0,             # HTTP request timeout in seconds
     max_retries: int = 3,              # retry attempts for 429 / 5xx errors
-    retry_backoff_factor: float = 0.5, # exponential backoff multiplier
+    initial_delay_ms: int = 250,       # initial retry delay in ms
+    max_delay_ms: int = 5000,          # max retry delay in ms
+    backoff_multiplier: float = 2.0,   # exponential backoff multiplier
+    jitter: bool = True,               # add random jitter to delays
     batch_size: int = 50,              # max procedures per batch POST chunk
                                        # values above 50 are silently clamped
                                        # to the server's hard limit
+    auto_batch_delay: float = 0.005,   # wait time in seconds to accumulate batch chunks
+    event_hooks: dict | None = None,   # dict mapping 'request'/'response' to async hooks
+    headers: dict | None = None,       # additional custom HTTP headers to send
+    retryable_status_codes: set | None = None, # custom HTTP status codes to trigger retry
 )
+
+# You can also configure the extreme maximum concurrency for massive bulk fetching operations 
+# (defaults to 500 to perfectly match the API rate limit). Dial this down to 50 or 100 if you
+# are running in constrained environments to save memory.
+# export WARERA_MAX_CONCURRENCY=50
 ```
 
 ---
@@ -728,5 +748,5 @@ MIT
 
 - **Bipin Krishnan (`bipinkrish` / `Bipin`)**: Initial architecture, core client implementation, rate-limiting foundations, and testing frameworks.
 - **PAIN (`PAIN「ᴀᴋᴀᴛsᴜᴋɪ」` / `CrucifiedPain`)**: Comprehensive expansion of Pydantic schemas, API parity updates, documentation overhauls, and feature additions.
-- **[WarEraProjects](https://github.com/wareraprojects/trpc)**: Instrumental in reverse-engineering undocumented API endpoints and the batch-request wire protocol.
+- **[WarEraProjects](https://github.com/wareraprojects)**: Massive credit to the official TypeScript Wrapper (`@wareraprojects/api`) team for providing the foundational schemas and reverse-engineering the underlying tRPC batching protocols.
 - **[Kore-rep](https://github.com/Kore-rep)**: Suggested the implementation of the adaptive rate-limiting engine.

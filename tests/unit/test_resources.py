@@ -15,6 +15,7 @@ from warera.resources.user import UserResource
 def _mock_http(return_value) -> MagicMock:
     http = MagicMock()
     http.get = AsyncMock(return_value=return_value)
+    http.get_swr = AsyncMock(return_value=return_value)
     return http
 
 

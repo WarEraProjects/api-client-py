@@ -133,6 +133,15 @@ class RankingType(StrEnum):  # type: ignore[misc]
     MU_TERRAIN = "muTerrain"
     MU_WEALTH = "muWealth"
     MU_BOUNTY = "muBounty"
+    MU_REPUTATION = "muReputation"
+
+    # Alliance rankings
+    ALLIANCE_INITIAL_DEVELOPMENT = "allianceInitialDevelopment"
+    ALLIANCE_DEVELOPMENT = "allianceDevelopment"
+    ALLIANCE_WEEKLY_DAMAGES = "allianceWeeklyDamages"
+    ALLIANCE_DAMAGES = "allianceDamages"
+    ALLIANCE_POPULATION = "alliancePopulation"
+    ALLIANCE_WEEKLY_DAMAGES_PER_CITIZEN = "allianceWeeklyDamagesPerCitizen"
 
 
 # ---------------------------------------------------------------------------

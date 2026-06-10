@@ -4,7 +4,7 @@ Shared Pydantic base types used across all models.
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -78,24 +78,26 @@ class CursorPage(WareraModel, Generic[T]):
         Parse a raw API response dict into a typed CursorPage.
         Handles both wrapped `{items, nextCursor}` and plain list responses.
         """
+        # Pre-resolve the validator once — all our models are Pydantic BaseModel
+        # subclasses so this avoids per-item hasattr + cast overhead.
+        _validate = getattr(item_type, "model_validate", None)
+
         if isinstance(raw, list):
-            items = []
-            for r in raw:
-                if isinstance(r, dict) and hasattr(item_type, "model_validate"):
-                    items.append(cast(Any, item_type).model_validate(r))
-                else:
-                    items.append(r)
+            if _validate is not None:
+                items = [_validate(r) for r in raw if isinstance(r, dict)]
+            else:
+                items = list(raw)
             return cls(items=items, next_cursor=None, has_more=False)
 
         if isinstance(raw, dict):
             raw_items = raw.get("items", raw.get("data", []))
-            items = []
             if isinstance(raw_items, list):
-                for r in raw_items:
-                    if isinstance(r, dict) and hasattr(item_type, "model_validate"):
-                        items.append(cast(Any, item_type).model_validate(r))
-                    else:
-                        items.append(r)
+                if _validate is not None:
+                    items = [_validate(r) for r in raw_items if isinstance(r, dict)]
+                else:
+                    items = list(raw_items)
+            else:
+                items = []
 
             next_cursor = raw.get("nextCursor") or raw.get("next_cursor")
             has_more = bool(raw.get("hasMore", raw.get("has_more", bool(next_cursor))))

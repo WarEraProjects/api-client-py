@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .._batch import fetch_many_by_ids
+from .._cache import async_memoize
 from ..models.region import Region
 from ._base import BaseResource
 
@@ -17,10 +17,10 @@ class RegionResource(BaseResource):
         raw = await self._get("region.getById", regionId=region_id)
         return Region.model_validate(raw)
 
+    @async_memoize
     async def get_all(self) -> dict[str, Region]:
         """
         Get all regions as a dict keyed by region ID.
-        This is a large payload — cache it if you call it repeatedly.
         """
         raw = await self._get("region.getRegionsObject")
         if isinstance(raw, dict):
@@ -30,9 +30,10 @@ class RegionResource(BaseResource):
             return {r.id: r for r in regions if r.id}
         return {}
 
-    async def get_many(self, region_ids: list[str], batch_size: int = 50) -> list[Region]:
-        """Fetch multiple regions by ID in batched POST requests."""
-        raw_list = await fetch_many_by_ids(
-            self._http, "region.getById", "regionId", region_ids, batch_size
-        )
-        return [Region.model_validate(r) for r in raw_list]
+    async def get_many(self, region_ids: list[str]) -> list[Region | None]:
+        """Fetch multiple regions by ID concurrently using the auto-batcher."""
+        import asyncio
+
+        futs = [self.get(rid) for rid in region_ids]
+        results = await asyncio.gather(*futs, return_exceptions=True)
+        return [r if not isinstance(r, BaseException) else None for r in results]

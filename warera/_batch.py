@@ -99,11 +99,14 @@ class BatchSession:
     concurrent POST requests automatically.
     """
 
-    def __init__(self, http: Any, batch_size: int = DEFAULT_BATCH_SIZE) -> None:
+    def __init__(
+        self, http: Any, batch_size: int = DEFAULT_BATCH_SIZE, concurrency: int | None = None
+    ) -> None:
         # `http` is an HttpSession instance — typed as Any to avoid circular import
         self._http = http
         # Clamp to the API hard limit — requests with >50 procedures are rejected.
         self._batch_size = min(batch_size, MAX_BATCH_SIZE)
+        self._concurrency = concurrency
         self._queue: list[BatchItem[Any]] = []
 
     def __str__(self) -> str:
@@ -135,8 +138,17 @@ class BatchSession:
             for i in range(0, len(self._queue), self._batch_size)
         ]
 
-        # Fire all chunks concurrently
-        await asyncio.gather(*[self._flush_chunk(chunk) for chunk in chunks])
+        # Fire all chunks concurrently with limits if specified
+        if self._concurrency is not None:
+            sem = asyncio.Semaphore(self._concurrency)
+
+            async def _flush_with_sem(chunk: list[BatchItem[Any]]) -> None:
+                async with sem:
+                    await self._flush_chunk(chunk)
+
+            await asyncio.gather(*[_flush_with_sem(chunk) for chunk in chunks])
+        else:
+            await asyncio.gather(*[self._flush_chunk(chunk) for chunk in chunks])
 
     async def _flush_chunk(self, chunk: list[BatchItem[Any]]) -> None:
         procedures = [item.procedure for item in chunk]
@@ -182,6 +194,7 @@ async def fetch_many_by_ids(
     id_param: str,
     ids: list[str],
     batch_size: int = DEFAULT_BATCH_SIZE,
+    concurrency: int | None = None,
 ) -> list[Any]:
     """
     Fetch the same procedure for many IDs, auto-splitting into batch chunks
@@ -206,15 +219,21 @@ async def fetch_many_by_ids(
     effective_size = min(batch_size, MAX_BATCH_SIZE)
     chunks = [ids[i : i + effective_size] for i in range(0, len(ids), effective_size)]
 
+    sem = asyncio.Semaphore(concurrency) if concurrency is not None else None
+
     async def fetch_chunk(chunk: list[str]) -> list[Any]:
-        procedures = [procedure] * len(chunk)
-        inputs = [{id_param: id_} for id_ in chunk]
-        try:
-            return cast(list[Any], await http.post_batch(procedures, inputs))
-        except WareraBatchError as exc:
-            # Partial failure — return None for failed indices so callers
-            # can filter them out without losing the rest of the chunk.
-            return [exc.results.get(i, None) for i in range(len(chunk))]
+        async def _do() -> list[Any]:
+            procedures = [procedure] * len(chunk)
+            inputs = [{id_param: id_} for id_ in chunk]
+            try:
+                return cast(list[Any], await http.post_batch(procedures, inputs))
+            except WareraBatchError as exc:
+                return [exc.results.get(i, None) for i in range(len(chunk))]
+
+        if sem is not None:
+            async with sem:
+                return await _do()
+        return await _do()
 
     chunk_results = await asyncio.gather(*[fetch_chunk(c) for c in chunks])
     return [item for sublist in chunk_results for item in sublist]

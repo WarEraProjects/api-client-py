@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Any
 
-from .._batch import fetch_many_by_ids
-from .._pagination import collect_all, paginate
 from ..models.common import CursorPage
 from ..models.company import Company
 from ._base import BaseResource
@@ -96,14 +96,53 @@ class CompanyResource(BaseResource):
         raw = await self._get("company.getById", companyId=company_id)
         return Company.model_validate(raw)
 
+    @typing.overload
     async def get_companies(
         self,
         *,
         user_id: str | None = None,
         per_page: int = 10,
         cursor: str | None = None,
-    ) -> CursorPage[Company]:
+        auto_items: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[Company]: ...
+
+    @typing.overload
+    async def get_companies(
+        self,
+        *,
+        user_id: str | None = None,
+        per_page: int = 10,
+        cursor: str | None = None,
+        auto_items: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Company]: ...
+
+    async def get_companies(
+        self,
+        *,
+        user_id: str | None = None,
+        per_page: int = 10,
+        cursor: str | None = None,
+        auto_items: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[Company] | AsyncIterator[Company]:
         """Get companies, optionally filtered by owner user ID (cursor-paginated)."""
+        if auto_items:
+            from .._pagination import auto_paginate_items
+
+            return auto_paginate_items(
+                self.get_companies,
+                max_pages=max_pages,
+                cursor=cursor,
+                cursor_end=cursor_end,
+                user_id=user_id,
+                per_page=per_page,
+            )
+
         raw = await self._get(
             "company.getCompanies",
             userId=user_id,
@@ -114,7 +153,32 @@ class CompanyResource(BaseResource):
 
     async def get_by_user(self, user_id: str, **kwargs: Any) -> list[Company]:
         """Convenience: fetch all companies owned by a user (collects all pages)."""
-        return await collect_all(self.get_companies, user_id=user_id, **kwargs)
+        items = []
+        async for item in await self.get_companies(user_id=user_id, auto_items=True, **kwargs):
+            items.append(item)
+        return items
+
+    async def collect_all(
+        self,
+        oldest_date: datetime | str | None = None,
+        time_slice_days: int = 30,
+        concurrency: int = 500,
+        **kwargs: Any,
+    ) -> list[Company]:
+        """
+        Convenience: fetch all companies globally (or by country if passed) using parallel slicing.
+        This is much faster than fetching sequentially.
+        """
+        from .._pagination import parallel_collect_all
+
+        return await parallel_collect_all(
+            self.get_companies,
+            oldest_date=oldest_date,
+            time_slice_days=time_slice_days,
+            concurrency=concurrency,
+            per_page=50,
+            **kwargs,
+        )
 
     async def get_recommended_regions(
         self,
@@ -158,21 +222,81 @@ class CompanyResource(BaseResource):
         return CompanyProductionBonus.from_raw({})
 
     # ------------------------------------------------------------------
-    # Pagination helpers
+    # Batch helpers
     # ------------------------------------------------------------------
 
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[Company]:
-        """Async generator over all companies matching the given filters."""
-        async for item in paginate(self.get_companies, **kwargs):
-            yield item
+    async def get_many(
+        self, company_ids: list[str], *, concurrency: int = 500
+    ) -> list[Company | None]:
+        """Fetch multiple companies by ID concurrently using the auto-batcher."""
+        from .._batch import BatchSession
 
-    # ------------------------------------------------------------------
-    # Batch helper
-    # ------------------------------------------------------------------
+        if not company_ids:
+            return []
 
-    async def get_many(self, company_ids: list[str], batch_size: int = 50) -> list[Company]:
-        """Fetch multiple companies by ID in batched POST requests."""
-        raw_list = await fetch_many_by_ids(
-            self._http, "company.getById", "companyId", company_ids, batch_size
-        )
-        return [Company.model_validate(r) for r in raw_list]
+        all_companies: list[Company | None] = []
+        batch = BatchSession(self._http, concurrency=concurrency)
+        items = []
+        for cid in company_ids:
+            items.append(batch.add("company.getById", {"companyId": cid}))
+
+        await batch.flush()
+
+        for item in items:
+            if item.ok and item.result:
+                all_companies.append(Company.model_validate(item.result))
+            else:
+                all_companies.append(None)
+
+        return all_companies
+
+    async def collect_by_users(
+        self,
+        user_ids: list[str],
+        *,
+        concurrency: int = 500,
+    ) -> list[Company]:
+        """
+        Fetch all companies owned by a list of users.
+        Uses native tRPC batching to group up to 50 user queries per HTTP request,
+        making it extremely fast and rate-limit friendly.
+
+        Args:
+            user_ids:    List of user ID strings to fetch companies for.
+            concurrency: Max concurrent requests.
+
+        Returns:
+            A flat list of all :class:`Company` objects across every user.
+        """
+        from .._batch import BatchSession
+
+        if not user_ids:
+            return []
+
+        all_companies: list[Company] = []
+        current_queries = [{"userId": uid} for uid in user_ids]
+
+        # Loop until all pages for all users have been fetched
+        while current_queries:
+            next_queries = []
+            batch = BatchSession(self._http, concurrency=concurrency)
+
+            # Queue up all current queries
+            items = []
+            for q in current_queries:
+                items.append((q, batch.add("company.getCompanies", {**q, "perPage": 50})))
+
+            # Flush sends them to the API in concurrent chunks of 50
+            await batch.flush()
+
+            # Process results and check for next pages
+            for q, item in items:
+                if item.ok:
+                    page = CursorPage.from_raw(item.result, Company)
+                    all_companies.extend(page.items)
+                    if page.has_more and page.next_cursor:
+                        next_queries.append({**q, "cursor": page.next_cursor})
+
+            current_queries = next_queries
+
+        return all_companies

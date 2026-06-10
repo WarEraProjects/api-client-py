@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from .._batch import fetch_many_by_ids
 from ..models.round_ import Hit, Round
 from ._base import BaseResource
 
@@ -29,9 +28,10 @@ class RoundResource(BaseResource):
             items = []
         return [Hit.model_validate(h) for h in items]
 
-    async def get_many(self, round_ids: list[str], batch_size: int = 50) -> list[Round]:
-        """Fetch multiple rounds by ID in batched POST requests."""
-        raw_list = await fetch_many_by_ids(
-            self._http, "round.getById", "roundId", round_ids, batch_size
-        )
-        return [Round.model_validate(r) for r in raw_list]
+    async def get_many(self, round_ids: list[str]) -> list[Round | None]:
+        """Fetch multiple rounds by ID concurrently using the auto-batcher."""
+        import asyncio
+
+        futs = [self.get(rid) for rid in round_ids]
+        results = await asyncio.gather(*futs, return_exceptions=True)
+        return [r if not isinstance(r, BaseException) else None for r in results]

@@ -18,5 +18,5 @@ class GameConfigResource(BaseResource):
 
     async def get(self) -> GameConfig:
         """Get the full static game configuration (items, resources, industries, etc.)."""
-        raw = await self._get("gameConfig.getGameConfig")
+        raw = await self._get_swr("gameConfig.getGameConfig", ttl_seconds=3600)
         return GameConfig.model_validate(raw)

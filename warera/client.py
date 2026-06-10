@@ -109,10 +109,18 @@ class WareraClient:
         api_key: str | None = None,
         *,
         base_url: str = DEFAULT_BASE_URL,
-        timeout: float = 10.0,
+        timeout: float = 30.0,
         max_retries: int = 3,
-        retry_backoff_factor: float = 0.5,
+        initial_delay_ms: int = 250,
+        max_delay_ms: int = 5000,
+        backoff_multiplier: float = 2.0,
+        jitter: bool = True,
+        retryable_status_codes: set[int] | list[int] | tuple[int, ...] | None = None,
         batch_size: int = 50,
+        concurrency: int | None = None,
+        auto_batch_delay: float = 0.005,
+        event_hooks: dict[str, list[Any]] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """
         Args:
@@ -122,18 +130,36 @@ class WareraClient:
             base_url:             Override the API base URL (useful for testing).
             timeout:              HTTP request timeout in seconds.
             max_retries:          Max retry attempts for 429 / 5xx errors.
-            retry_backoff_factor: Multiplier for exponential backoff between retries.
+            initial_delay_ms:     Initial retry delay in milliseconds (default: 250).
+            max_delay_ms:         Maximum retry delay in milliseconds (default: 5000).
+            backoff_multiplier:   Multiplier for exponential backoff (default: 2.0).
+            jitter:               Whether to add random jitter to retry delays (default: True).
+            retryable_status_codes: Custom set of HTTP status codes to retry on (default: 408, 409, 425, 429, 50x).
             batch_size:           Default max procedures per batch POST.
+            concurrency:          Default max concurrent chunk POSTs per batch flush.
+            auto_batch_delay:     Wait time (in seconds) to accumulate concurrent requests
+                                  before flushing the batch (aligns with tRPC httpBatchLink).
+            event_hooks:          Dictionary mapping 'request' or 'response' to a list of
+                                  async hook functions (aligns with tRPC Links/Middleware).
+            headers:              Additional custom HTTP headers to send with every request.
         """
         self._http = HttpSession(
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
-            retry_backoff_factor=retry_backoff_factor,
+            initial_delay_ms=initial_delay_ms,
+            max_delay_ms=max_delay_ms,
+            backoff_multiplier=backoff_multiplier,
+            jitter=jitter,
+            retryable_status_codes=retryable_status_codes,
+            auto_batch_delay=auto_batch_delay,
+            event_hooks=event_hooks,
+            headers=headers,
         )
         # Clamp to server hard limit — the API rejects batches > 50 procedures.
         self._batch_size = min(batch_size, MAX_BATCH_SIZE)
+        self._concurrency = concurrency
 
         # --- Resource namespaces ---
         self.user = UserResource(self._http)
@@ -184,7 +210,7 @@ class WareraClient:
         await self._http.aclose()
 
     # ------------------------------------------------------------------
-    # Rate-limit introspection
+    # Rate-limit introspection & cumulative stats
     # ------------------------------------------------------------------
 
     @property
@@ -203,11 +229,38 @@ class WareraClient:
         """
         return self._http._rate_limit.limit
 
+    @property
+    def stats(self) -> dict[str, int | float | None]:
+        """
+        Cumulative session statistics for diagnostics and benchmarking.
+
+        Keys:
+            total_http_requests:      Raw HTTP requests made (GET + POST).
+            total_procedures:         Individual tRPC procedures called
+                                      (a batch of 50 counts as 50).
+            window_refreshes:         Times the rate-limit window refreshed
+                                      (remaining jumped back up in headers).
+            total_wait_seconds:       Time spent sleeping on rate limits.
+            quota_used_current_window: Requests consumed in the current window.
+            quota_limit_per_window:   Server-reported max requests per window.
+            quota_remaining:          Requests remaining in current window.
+        """
+        rl = self._http._rate_limit
+        return {
+            "total_http_requests": rl.total_http_requests,
+            "total_procedures": rl.total_procedures,
+            "window_refreshes": rl.window_refreshes,
+            "total_wait_seconds": rl.total_wait_seconds,
+            "quota_used_current_window": rl.quota_used_current_window,
+            "quota_limit_per_window": rl.limit,
+            "quota_remaining": rl.remaining,
+        }
+
     # ------------------------------------------------------------------
     # Batch
     # ------------------------------------------------------------------
 
-    def batch(self, batch_size: int | None = None) -> BatchSession:
+    def batch(self, batch_size: int | None = None, concurrency: int | None = None) -> BatchSession:
         """
         Create a BatchSession for sending multiple procedures in one HTTP round-trip.
 
@@ -221,11 +274,13 @@ class WareraClient:
 
         Args:
             batch_size: Override the client's default batch chunk size.
+            concurrency: Override the client's default concurrency limit.
         """
         return BatchSession(
             http=self._http,
             # BatchSession will also clamp; being explicit here is good for clarity.
             batch_size=min(batch_size, MAX_BATCH_SIZE) if batch_size else self._batch_size,
+            concurrency=concurrency if concurrency is not None else self._concurrency,
         )
 
     # ------------------------------------------------------------------

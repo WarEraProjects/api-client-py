@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator
-from typing import Any
 
-from .._pagination import collect_all, paginate
 from ..models.common import CursorPage
 from ..models.mercenary_contract_auction import MercenaryContractAuction
 from ._base import BaseResource
@@ -15,6 +14,7 @@ class MercenaryContractAuctionResource(BaseResource):
       • mercenaryContractAuction.getPaginatedAuctions
     """
 
+    @typing.overload
     async def get_paginated_auctions(
         self,
         *,
@@ -23,10 +23,53 @@ class MercenaryContractAuctionResource(BaseResource):
         status: str | None = None,
         limit: int = 10,
         cursor: str | None = None,
-    ) -> CursorPage[MercenaryContractAuction]:
+        auto_items: typing.Literal[True],
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> AsyncIterator[MercenaryContractAuction]: ...
+
+    @typing.overload
+    async def get_paginated_auctions(
+        self,
+        *,
+        country_id: str | None = None,
+        battle_id: str | None = None,
+        status: str | None = None,
+        limit: int = 10,
+        cursor: str | None = None,
+        auto_items: typing.Literal[False] = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[MercenaryContractAuction]: ...
+
+    async def get_paginated_auctions(
+        self,
+        *,
+        country_id: str | None = None,
+        battle_id: str | None = None,
+        status: str | None = None,
+        limit: int = 10,
+        cursor: str | None = None,
+        auto_items: bool = False,
+        max_pages: int | float = float("inf"),
+        cursor_end: str | None = None,
+    ) -> CursorPage[MercenaryContractAuction] | AsyncIterator[MercenaryContractAuction]:
         """
         Get mercenary contract auctions (cursor-paginated).
         """
+        if auto_items:
+            from .._pagination import auto_paginate_items
+
+            return auto_paginate_items(
+                self.get_paginated_auctions,
+                max_pages=max_pages,
+                cursor_end=cursor_end,
+                country_id=country_id,
+                battle_id=battle_id,
+                status=status,
+                limit=limit,
+            )
+
         raw = await self._get(
             "mercenaryContractAuction.getPaginatedAuctions",
             countryId=country_id,
@@ -37,11 +80,30 @@ class MercenaryContractAuctionResource(BaseResource):
         )
         return CursorPage.from_raw(raw, MercenaryContractAuction)
 
-    async def paginate(self, **kwargs: Any) -> AsyncIterator[MercenaryContractAuction]:
-        """Async generator over mercenary contract auctions matching the given filters."""
-        async for item in paginate(self.get_paginated_auctions, **kwargs):
-            yield item
 
-    async def collect_all(self, **kwargs: Any) -> list[MercenaryContractAuction]:
-        """Collect all mercenary contract auctions across all pages."""
-        return await collect_all(self.get_paginated_auctions, **kwargs)
+    async def collect_all(self, **kwargs: typing.Any) -> list[MercenaryContractAuction]:
+        """Fetch all items across all pages concurrently using parallel time-slicing."""
+        import warnings
+
+        warnings.warn(
+            "`collect_all()` is deprecated. Use `get_all()` directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from .._pagination import parallel_collect_all
+
+        fetch_fn = (
+            getattr(self, "get_paginated", None)
+            or getattr(self, "get_many", None)
+            or getattr(self, "get_all", None)
+        )
+        if fetch_fn is None:
+            raise NotImplementedError("Pagination not supported on this resource")
+
+        return await parallel_collect_all(
+            fetch_fn,
+            oldest_date=kwargs.pop("oldest_date", None),
+            time_slice_days=kwargs.pop("time_slice_days", 0.2),
+            concurrency=kwargs.pop("concurrency", 500),
+            **kwargs,
+        )

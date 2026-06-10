@@ -167,8 +167,10 @@ class WareraClient:
         self.action_log = _wrap_resource(self._async_client.action_log)
         self.tournament = _wrap_resource(self._async_client.tournament)
 
-    def batch(self, batch_size: int | None = None) -> _SyncBatchSession:
-        return _SyncBatchSession(self._async_client.batch(batch_size))
+    def batch(
+        self, batch_size: int | None = None, concurrency: int | None = None
+    ) -> _SyncBatchSession:
+        return _SyncBatchSession(self._async_client.batch(batch_size, concurrency))
 
     def close(self) -> None:
         _run(self._async_client.aclose())
@@ -181,3 +183,64 @@ class WareraClient:
 
     def __repr__(self) -> str:
         return repr(self._async_client).replace("WareraClient", "sync.WareraClient")
+
+
+_default_client: WareraClient | None = None
+api_key: str | None = None
+
+
+def set_api_key(key: str) -> None:
+    """Configure the global API key for the module-level sync client."""
+    global api_key, _default_client
+    api_key = key
+    if _default_client is not None:
+        _default_client._async_client._http._api_key = key
+
+
+def get_client() -> WareraClient:
+    """Get or create the global synchronous WareraClient."""
+    global _default_client
+    if _default_client is None:
+        _default_client = WareraClient(api_key=api_key)
+    return _default_client
+
+
+_RESOURCE_NAMES = {
+    "action_log",
+    "article",
+    "battle",
+    "battle_loot_summary",
+    "battle_order",
+    "battle_ranking",
+    "company",
+    "country",
+    "donation",
+    "election",
+    "event",
+    "game_config",
+    "game_stat",
+    "government",
+    "inventory",
+    "item_trading",
+    "mercenary_contract_auction",
+    "mu",
+    "mu_member",
+    "party",
+    "ranking",
+    "region",
+    "round",
+    "search",
+    "tournament",
+    "transaction",
+    "upgrade",
+    "user",
+    "work",
+    "work_offer",
+    "worker",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _RESOURCE_NAMES:
+        return getattr(get_client(), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

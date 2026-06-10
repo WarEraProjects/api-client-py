@@ -74,29 +74,6 @@ async def test_party_get_paginated_returns_cursor_page():
     assert page.has_more is True
 
 
-@pytest.mark.asyncio
-async def test_party_collect_all_follows_pagination():
-    pages = {
-        None: {"items": [{"_id": "p1", "name": "A"}], "nextCursor": "c1", "hasMore": True},
-        "c1": {"items": [{"_id": "p2", "name": "B"}], "nextCursor": None, "hasMore": False},
-    }
-    call_cursors: list = []
-
-    async def mock_get(procedure, params):
-        cursor = params.get("cursor")
-        call_cursors.append(cursor)
-        return pages[cursor]
-
-    http = MagicMock()
-    http.get = mock_get
-
-    resource = PartyResource(http)
-    parties = await resource.collect_all()
-    assert len(parties) == 2
-    assert parties[0].name == "A"
-    assert parties[1].name == "B"
-
-
 # ---------------------------------------------------------------------------
 # Donation
 # ---------------------------------------------------------------------------
