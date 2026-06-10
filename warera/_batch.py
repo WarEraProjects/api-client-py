@@ -35,8 +35,10 @@ from .exceptions import WareraBatchError, WareraError
 
 T = TypeVar("T")
 
-# Max procedures per batch POST (keep URLs sane and avoid server limits)
-DEFAULT_BATCH_SIZE = 50
+# Hard server-side limit: the API rejects any batch with more than 50 procedures.
+# This matches the TRPC wrapper's MAX_MAX_BATCH_SIZE constant.
+MAX_BATCH_SIZE = 50
+DEFAULT_BATCH_SIZE = MAX_BATCH_SIZE
 
 
 @dataclass
@@ -89,7 +91,7 @@ class BatchSession:
 
         async with client.batch() as batch:
             item1 = batch.add("company.getById", {"companyId": "123"})
-            item2 = batch.add("user.getUserLite", {"userId": "456"})
+            item2 = batch.add("user.getUserById", {"userId": "456"})
 
         # After the block: item1.result, item2.result are populated.
 
@@ -100,7 +102,8 @@ class BatchSession:
     def __init__(self, http: Any, batch_size: int = DEFAULT_BATCH_SIZE) -> None:
         # `http` is an HttpSession instance — typed as Any to avoid circular import
         self._http = http
-        self._batch_size = batch_size
+        # Clamp to the API hard limit — requests with >50 procedures are rejected.
+        self._batch_size = min(batch_size, MAX_BATCH_SIZE)
         self._queue: list[BatchItem[Any]] = []
 
     def __str__(self) -> str:
@@ -159,9 +162,13 @@ class BatchSession:
         return self
 
     async def __aexit__(self, exc_type: Any, *_: Any) -> None:
-        # Only flush if no exception is propagating
-        if exc_type is None:
-            await self.flush()
+        # Only flush if no exception is propagating; always clear the queue
+        # in a finally block so the session is left in a clean state regardless.
+        try:
+            if exc_type is None:
+                await self.flush()
+        finally:
+            self._queue.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -185,20 +192,29 @@ async def fetch_many_by_ids(
         procedure:  e.g. "company.getById"
         id_param:   The input key name, e.g. "companyId"
         ids:        List of ID strings to fetch
-        batch_size: Max IDs per batch POST (default 50)
+        batch_size: Max IDs per batch POST (default 50, hard-capped at 50)
 
     Returns:
-        List of raw API responses in the same order as `ids`.
+        List of raw API responses in the same order as `ids`. Entries for
+        IDs the server could not find are returned as None rather than raising
+        and dropping the entire chunk — callers should filter out None values.
     """
     if not ids:
         return []
 
-    chunks = [ids[i : i + batch_size] for i in range(0, len(ids), batch_size)]
+    # Enforce the server hard limit regardless of what the caller passed.
+    effective_size = min(batch_size, MAX_BATCH_SIZE)
+    chunks = [ids[i : i + effective_size] for i in range(0, len(ids), effective_size)]
 
     async def fetch_chunk(chunk: list[str]) -> list[Any]:
         procedures = [procedure] * len(chunk)
         inputs = [{id_param: id_} for id_ in chunk]
-        return cast("list[Any]", await http.post_batch(procedures, inputs))
+        try:
+            return cast(list[Any], await http.post_batch(procedures, inputs))
+        except WareraBatchError as exc:
+            # Partial failure — return None for failed indices so callers
+            # can filter them out without losing the rest of the chunk.
+            return [exc.results.get(i, None) for i in range(len(chunk))]
 
     chunk_results = await asyncio.gather(*[fetch_chunk(c) for c in chunks])
     return [item for sublist in chunk_results for item in sublist]

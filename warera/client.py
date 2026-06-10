@@ -3,12 +3,12 @@ WareraClient — the single entry point for the WarEra API client library.
 
 Async usage (recommended):
     async with WareraClient(api_key="...") as client:
-        user = await client.user.get_lite("12345")
+        user = await client.user.get_by_id("12345")
 
 Sync usage (convenience shim):
     from warera.sync import WareraClient
     client = WareraClient(api_key="...")
-    user = client.user.get_lite("12345")
+    user = client.user.get_by_id("12345")
 
 No API key (anonymous, lower rate limits):
     async with WareraClient() as client:   # reads WARERA_API_KEY env var if set
@@ -26,34 +26,49 @@ from __future__ import annotations
 
 from typing import Any
 
-from ._batch import BatchSession
-from ._http import HttpSession
+from ._batch import MAX_BATCH_SIZE, BatchSession
+from ._http import DEFAULT_BASE_URL, HttpSession
+from .resources.action_log import ActionLogResource
 from .resources.article import ArticleResource
 from .resources.battle import BattleResource
+from .resources.battle_loot_summary import BattleLootSummaryResource
+from .resources.battle_order import BattleOrderResource
 from .resources.battle_ranking import BattleRankingResource
 from .resources.company import CompanyResource
 from .resources.country import CountryResource
+from .resources.donation import DonationResource
+from .resources.election import ElectionResource
 from .resources.event import EventResource
 from .resources.game_config import GameConfigResource
+from .resources.game_stat import GameStatResource
 from .resources.government import GovernmentResource
+from .resources.inventory import InventoryResource
 from .resources.item_trading import ItemTradingResource
+from .resources.mercenary_contract_auction import MercenaryContractAuctionResource
 from .resources.mu import MUResource
+from .resources.mu_member import MuMemberResource
+from .resources.party import PartyResource
 from .resources.ranking import RankingResource
 from .resources.region import RegionResource
 from .resources.round_ import RoundResource
 from .resources.search import SearchResource
+from .resources.tournament import TournamentResource
 from .resources.transaction import TransactionResource
 from .resources.upgrade import UpgradeResource
 from .resources.user import UserResource
+from .resources.work import WorkResource
 from .resources.work_offer import WorkOfferResource
 from .resources.worker import WorkerResource
-
-_DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
 
 
 class WareraClient:
     """
-    Async client for the WarEra tRPC API (v0.17.4-beta).
+    Async client for the WarEra tRPC API.
+
+    Rate limiting is handled automatically by reading the ``ratelimit-remaining``
+    and ``ratelimit-reset`` headers returned by the API on every response — no
+    hardcoded limits.  If the quota is exhausted the client sleeps for exactly
+    as long as the server says it needs to before sending the next request.
 
     All resource namespaces are exposed as attributes:
         client.user          → UserResource
@@ -63,25 +78,37 @@ class WareraClient:
         client.region        → RegionResource
         client.battle        → BattleResource
         client.battle_ranking→ BattleRankingResource
+        client.battle_order  → BattleOrderResource
         client.round         → RoundResource
         client.event         → EventResource
         client.item_trading  → ItemTradingResource
         client.work_offer    → WorkOfferResource
         client.worker        → WorkerResource
+        client.work          → WorkResource
         client.mu            → MUResource
+        client.mu_member     → MuMemberResource
+        client.party         → PartyResource
+        client.donation      → DonationResource
+        client.election      → ElectionResource
+        client.game_stat     → GameStatResource
         client.ranking       → RankingResource
         client.transaction   → TransactionResource
         client.upgrade       → UpgradeResource
         client.article       → ArticleResource
         client.search        → SearchResource
         client.game_config   → GameConfigResource
+        client.inventory     → InventoryResource
+        client.action_log    → ActionLogResource
+        client.battle_loot_summary → BattleLootSummaryResource
+        client.mercenary_contract_auction → MercenaryContractAuctionResource
+        client.tournament    → TournamentResource
     """
 
     def __init__(
         self,
         api_key: str | None = None,
         *,
-        base_url: str = _DEFAULT_BASE_URL,
+        base_url: str = DEFAULT_BASE_URL,
         timeout: float = 10.0,
         max_retries: int = 3,
         retry_backoff_factor: float = 0.5,
@@ -105,7 +132,8 @@ class WareraClient:
             max_retries=max_retries,
             retry_backoff_factor=retry_backoff_factor,
         )
-        self._batch_size = batch_size
+        # Clamp to server hard limit — the API rejects batches > 50 procedures.
+        self._batch_size = min(batch_size, MAX_BATCH_SIZE)
 
         # --- Resource namespaces ---
         self.user = UserResource(self._http)
@@ -114,19 +142,31 @@ class WareraClient:
         self.government = GovernmentResource(self._http)
         self.region = RegionResource(self._http)
         self.battle = BattleResource(self._http)
+        self.battle_loot_summary = BattleLootSummaryResource(self._http)
         self.battle_ranking = BattleRankingResource(self._http)
+        self.battle_order = BattleOrderResource(self._http)
         self.round = RoundResource(self._http)
         self.event = EventResource(self._http)
         self.item_trading = ItemTradingResource(self._http)
         self.work_offer = WorkOfferResource(self._http)
         self.worker = WorkerResource(self._http)
+        self.work = WorkResource(self._http)
+        self.mercenary_contract_auction = MercenaryContractAuctionResource(self._http)
         self.mu = MUResource(self._http)
+        self.mu_member = MuMemberResource(self._http)
+        self.party = PartyResource(self._http)
+        self.donation = DonationResource(self._http)
+        self.election = ElectionResource(self._http)
+        self.game_stat = GameStatResource(self._http)
         self.ranking = RankingResource(self._http)
         self.transaction = TransactionResource(self._http)
         self.upgrade = UpgradeResource(self._http)
         self.article = ArticleResource(self._http)
         self.search = SearchResource(self._http)
         self.game_config = GameConfigResource(self._http)
+        self.inventory = InventoryResource(self._http)
+        self.action_log = ActionLogResource(self._http)
+        self.tournament = TournamentResource(self._http)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -142,6 +182,26 @@ class WareraClient:
     async def aclose(self) -> None:
         """Explicitly close the underlying HTTP session."""
         await self._http.aclose()
+
+    # ------------------------------------------------------------------
+    # Rate-limit introspection
+    # ------------------------------------------------------------------
+
+    @property
+    def rate_limit_remaining(self) -> int | None:
+        """
+        Requests remaining in the current rate-limit window, as reported by
+        the most recent API response.  ``None`` if no response has been received yet.
+        """
+        return self._http._rate_limit.remaining
+
+    @property
+    def rate_limit_total(self) -> int | None:
+        """
+        Total requests allowed per window, as reported by the most recent API
+        response.  ``None`` if no response has been received yet.
+        """
+        return self._http._rate_limit.limit
 
     # ------------------------------------------------------------------
     # Batch
@@ -164,7 +224,8 @@ class WareraClient:
         """
         return BatchSession(
             http=self._http,
-            batch_size=batch_size or self._batch_size,
+            # BatchSession will also clamp; being explicit here is good for clarity.
+            batch_size=min(batch_size, MAX_BATCH_SIZE) if batch_size else self._batch_size,
         )
 
     # ------------------------------------------------------------------

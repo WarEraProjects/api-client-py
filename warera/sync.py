@@ -8,7 +8,7 @@ Usage:
     from warera.sync import WareraClient
 
     client = WareraClient(api_key="...")
-    user    = client.user.get_lite("12345")
+    user    = client.user.get_by_id("12345")
     prices  = client.item_trading.get_prices()
 
     # Batch
@@ -31,20 +31,33 @@ from typing import Any, cast
 from ._batch import BatchSession
 from .client import WareraClient as _AsyncClient
 
+try:
+    import nest_asyncio as _nest_asyncio
+
+    _HAS_NEST_ASYNCIO = True
+except ImportError:  # nest_asyncio is optional (only needed inside Jupyter)
+    _nest_asyncio = None
+    _HAS_NEST_ASYNCIO = False
+
 
 def _run(coro: Any) -> Any:
-    """Run a coroutine synchronously, reusing an existing loop if available."""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Inside an existing async context (e.g. Jupyter) — use nest_asyncio or raise
-            import nest_asyncio
+    """
+    Run a coroutine synchronously.
 
-            nest_asyncio.apply()
-            return loop.run_until_complete(coro)
+    Uses asyncio.get_running_loop() to safely detect whether we are already
+    inside a running event loop (e.g. Jupyter). The older get_event_loop()
+    is deprecated in Python 3.10 and raises a RuntimeError in 3.12 when
+    called with no current loop, making get_running_loop() the correct choice.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        # Already inside a running event loop (e.g. Jupyter) — use nest_asyncio.
+        if _HAS_NEST_ASYNCIO and _nest_asyncio is not None:
+            _nest_asyncio.apply()
+        return loop.run_until_complete(coro)
     except RuntimeError:
-        pass
-    return asyncio.run(coro)
+        # No running loop — safe to call asyncio.run().
+        return asyncio.run(coro)
 
 
 def _sync_generator(async_gen_fn: Any, *args: Any, **kwargs: Any) -> list[Any]:
@@ -126,19 +139,33 @@ class WareraClient:
         self.government = _wrap_resource(self._async_client.government)
         self.region = _wrap_resource(self._async_client.region)
         self.battle = _wrap_resource(self._async_client.battle)
+        self.battle_loot_summary = _wrap_resource(self._async_client.battle_loot_summary)
         self.battle_ranking = _wrap_resource(self._async_client.battle_ranking)
+        self.battle_order = _wrap_resource(self._async_client.battle_order)
         self.round = _wrap_resource(self._async_client.round)
         self.event = _wrap_resource(self._async_client.event)
         self.item_trading = _wrap_resource(self._async_client.item_trading)
         self.work_offer = _wrap_resource(self._async_client.work_offer)
         self.worker = _wrap_resource(self._async_client.worker)
+        self.work = _wrap_resource(self._async_client.work)
+        self.mercenary_contract_auction = _wrap_resource(
+            self._async_client.mercenary_contract_auction
+        )
         self.mu = _wrap_resource(self._async_client.mu)
+        self.mu_member = _wrap_resource(self._async_client.mu_member)
+        self.party = _wrap_resource(self._async_client.party)
+        self.donation = _wrap_resource(self._async_client.donation)
+        self.election = _wrap_resource(self._async_client.election)
+        self.game_stat = _wrap_resource(self._async_client.game_stat)
         self.ranking = _wrap_resource(self._async_client.ranking)
         self.transaction = _wrap_resource(self._async_client.transaction)
         self.upgrade = _wrap_resource(self._async_client.upgrade)
         self.article = _wrap_resource(self._async_client.article)
         self.search = _wrap_resource(self._async_client.search)
         self.game_config = _wrap_resource(self._async_client.game_config)
+        self.inventory = _wrap_resource(self._async_client.inventory)
+        self.action_log = _wrap_resource(self._async_client.action_log)
+        self.tournament = _wrap_resource(self._async_client.tournament)
 
     def batch(self, batch_size: int | None = None) -> _SyncBatchSession:
         return _SyncBatchSession(self._async_client.batch(batch_size))

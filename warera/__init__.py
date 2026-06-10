@@ -1,5 +1,5 @@
 """
-warera-client — Python client for the WarEra tRPC API (v0.17.4-beta)
+warera-client — Python client for the WarEra tRPC API
 
 Quick start:
     import asyncio
@@ -7,7 +7,7 @@ Quick start:
 
     async def main():
         async with WareraClient(api_key="YOUR_KEY") as client:
-            user = await client.user.get_lite("12345")
+            user = await client.user.get_by_id("12345")
             print(user.username)
 
     asyncio.run(main())
@@ -15,13 +15,15 @@ Quick start:
 Sync:
     from warera.sync import WareraClient
     client = WareraClient(api_key="YOUR_KEY")
-    user = client.user.get_lite("12345")
+    user = client.user.get_by_id("12345")
 """
 
 from ._enums import (
+    ActionLogActionType,
     ArticleType,
     BattleDirection,
     BattleFilter,
+    BattleOrderSide,
     BattleRankingDataType,
     BattleRankingEntityType,
     BattleRankingSide,
@@ -43,14 +45,21 @@ from .exceptions import (
     WareraValidationError,
 )
 from .models import (
+    ActionLog,
     Article,
     ArticleLite,
     Battle,
     BattleLive,
+    BattleOrder,
     BattleRankingEntry,
     Company,
     Country,
     CursorPage,
+    Donation,
+    DonationTotals,
+    Election,
+    ElectionCandidate,
+    Equipment,
     Event,
     GameConfig,
     GameDates,
@@ -59,6 +68,9 @@ from .models import (
     ItemOffer,
     ItemPrice,
     MilitaryUnit,
+    MuMember,
+    Party,
+    PartyEthics,
     RankingEntry,
     Region,
     Round,
@@ -67,11 +79,14 @@ from .models import (
     Transaction,
     Upgrade,
     User,
+    UserLite,
     Worker,
+    WorkerCount,
     WorkOffer,
+    WorkStats,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.8"
 
 __all__ = [
     # Client
@@ -87,9 +102,11 @@ __all__ = [
     "WareraValidationError",
     "WareraBatchError",
     # Enums
+    "ActionLogActionType",
     "ArticleType",
     "BattleDirection",
     "BattleFilter",
+    "BattleOrderSide",
     "BattleRankingDataType",
     "BattleRankingEntityType",
     "BattleRankingSide",
@@ -98,14 +115,21 @@ __all__ = [
     "TransactionType",
     "UpgradeType",
     # Models
+    "ActionLog",
     "Article",
     "ArticleLite",
     "Battle",
     "BattleLive",
+    "BattleOrder",
     "BattleRankingEntry",
     "Company",
     "Country",
     "CursorPage",
+    "Donation",
+    "DonationTotals",
+    "Election",
+    "ElectionCandidate",
+    "Equipment",
     "Event",
     "GameConfig",
     "GameDates",
@@ -114,6 +138,9 @@ __all__ = [
     "ItemOffer",
     "ItemPrice",
     "MilitaryUnit",
+    "MuMember",
+    "Party",
+    "PartyEthics",
     "RankingEntry",
     "Region",
     "Round",
@@ -122,6 +149,9 @@ __all__ = [
     "Transaction",
     "Upgrade",
     "User",
+    "UserLite",
     "WorkOffer",
+    "WorkStats",
     "Worker",
+    "WorkerCount",
 ]
