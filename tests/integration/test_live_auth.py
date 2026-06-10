@@ -51,11 +51,15 @@ async def test_validate_api_key(client):
 async def test_transactions_paginated(client):
     page = await client.transaction.get_paginated(limit=10)
     assert len(page.items) > 0
-    txn = page.items[0]
-    assert isinstance(txn, Transaction)
-    assert txn.id is not None
-    assert txn.transaction_type is not None
-    assert txn.money is not None
+    for txn in page.items:
+        assert isinstance(txn, Transaction)
+        assert txn.id is not None
+        assert txn.transaction_type is not None
+    # `money` is present on monetary types (wage, trading, ...) but absent on
+    # others (e.g. dismantleItem) — assert it only where applicable.
+    monetary = [t for t in page.items if t.transaction_type in ("wage", "trading", "itemMarket")]
+    for txn in monetary:
+        assert txn.money is not None
 
 
 async def test_transactions_item_object_is_typed(client):
