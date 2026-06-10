@@ -24,6 +24,7 @@ Every public endpoint was validated field-by-field against live production paylo
 - **`set_api_key(key, validate=True)`** (sync module) validates the key against the server immediately and raises if rejected.
 - New `WareraClient.has_api_key` property.
 - **Clearer 403s**: `WareraForbiddenError` now explains that some endpoints (work stats, action logs) only return data for the key owner's own account.
+- **`on_retry` callback** (parity with the TS wrapper's `onRetry`): `WareraClient(on_retry=fn)` invokes `fn(RetryInfo(attempt, delay_s, error, status_code))` before each retry sleep — ideal for custom metrics/alerting. Callback exceptions are logged and never break the retry loop. `RetryInfo` is exported from the package root.
 
 ### 🖨️ Full-Value Printing & Typed User Fields
 

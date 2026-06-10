@@ -27,7 +27,7 @@ from __future__ import annotations
 from typing import Any
 
 from ._batch import MAX_BATCH_SIZE, BatchSession
-from ._http import DEFAULT_BASE_URL, HttpSession
+from ._http import DEFAULT_BASE_URL, HttpSession, OnRetryCallback
 from .resources.action_log import ActionLogResource
 from .resources.article import ArticleResource
 from .resources.battle import BattleResource
@@ -121,6 +121,7 @@ class WareraClient:
         auto_batch_delay: float = 0.005,
         event_hooks: dict[str, list[Any]] | None = None,
         headers: dict[str, str] | None = None,
+        on_retry: OnRetryCallback | None = None,
     ) -> None:
         """
         Args:
@@ -142,6 +143,10 @@ class WareraClient:
             event_hooks:          Dictionary mapping 'request' or 'response' to a list of
                                   async hook functions (aligns with tRPC Links/Middleware).
             headers:              Additional custom HTTP headers to send with every request.
+            on_retry:             Optional callback invoked before each retry sleep with a
+                                  :class:`warera.RetryInfo` (attempt, delay_s, error,
+                                  status_code) — mirrors the TS wrapper's ``onRetry``.
+                                  Exceptions raised by the callback are logged and ignored.
         """
         self._http = HttpSession(
             api_key=api_key,
@@ -156,6 +161,7 @@ class WareraClient:
             auto_batch_delay=auto_batch_delay,
             event_hooks=event_hooks,
             headers=headers,
+            on_retry=on_retry,
         )
         # Clamp to server hard limit — the API rejects batches > 50 procedures.
         self._batch_size = min(batch_size, MAX_BATCH_SIZE)

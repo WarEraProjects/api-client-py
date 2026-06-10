@@ -470,3 +470,70 @@ async def test_validate_api_key_false_without_key_and_no_request(monkeypatch):
         assert client.has_api_key is False
         assert await client.validate_api_key() is False
     assert not route.called
+
+
+# ---------------------------------------------------------------------------
+# on_retry callback
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_on_retry_callback_invoked_with_details():
+    from warera.exceptions import WareraServerError
+
+    calls: list = []
+    respx.get(url__startswith=BASE).mock(
+        side_effect=[
+            httpx.Response(500, json={}),
+            httpx.Response(502, json={}),
+            httpx.Response(200, json=_make_trpc_ok({"ok": True})),
+        ]
+    )
+
+    async with HttpSession(
+        base_url=BASE, initial_delay_ms=1, max_delay_ms=2, on_retry=calls.append
+    ) as session:
+        result = await session.get("country.getAllCountries", {})
+
+    assert result == {"ok": True}
+    assert [c.attempt for c in calls] == [1, 2]
+    assert calls[0].status_code == 500
+    assert calls[1].status_code == 502
+    assert isinstance(calls[0].error, WareraServerError)
+    assert all(c.delay_s >= 0 for c in calls)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_on_retry_callback_errors_are_swallowed():
+    def bad_callback(info):
+        raise RuntimeError("user callback bug")
+
+    respx.get(url__startswith=BASE).mock(
+        side_effect=[
+            httpx.Response(500, json={}),
+            httpx.Response(200, json=_make_trpc_ok({"ok": True})),
+        ]
+    )
+
+    async with HttpSession(
+        base_url=BASE, initial_delay_ms=1, max_delay_ms=2, on_retry=bad_callback
+    ) as session:
+        result = await session.get("country.getAllCountries", {})
+
+    assert result == {"ok": True}
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_on_retry_not_called_on_first_try_success():
+    calls: list = []
+    respx.get(url__startswith=BASE).mock(
+        return_value=httpx.Response(200, json=_make_trpc_ok({"ok": True}))
+    )
+
+    async with HttpSession(base_url=BASE, on_retry=calls.append) as session:
+        await session.get("country.getAllCountries", {})
+
+    assert calls == []

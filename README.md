@@ -690,7 +690,14 @@ WareraClient(
     event_hooks: dict | None = None,   # dict mapping 'request'/'response' to async hooks
     headers: dict | None = None,       # additional custom HTTP headers to send
     retryable_status_codes: set | None = None, # custom HTTP status codes to trigger retry
+    on_retry: Callable | None = None,  # called before each retry sleep with a RetryInfo
 )
+
+# on_retry example — feed retries into your own logs/metrics:
+def log_retry(info: warera.RetryInfo) -> None:
+    print(f"retry #{info.attempt}: HTTP {info.status_code}, waiting {info.delay_s:.2f}s")
+
+client = WareraClient(on_retry=log_retry)
 
 # You can also configure the extreme maximum concurrency for massive bulk fetching operations 
 # (defaults to 500 to perfectly match the API rate limit). Dial this down to 50 or 100 if you

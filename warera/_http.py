@@ -29,6 +29,8 @@ import logging
 import os
 import random
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
@@ -57,6 +59,29 @@ logger = logging.getLogger("warera.http")
 
 # Public constant so client.py can import it instead of duplicating the string.
 DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
+
+
+@dataclass(frozen=True)
+class RetryInfo:
+    """
+    Details passed to the ``on_retry`` callback just before each retry sleep.
+
+    Attributes:
+        attempt:     The attempt number that just failed (1-based — the first
+                     retry receives ``attempt=1``).
+        delay_s:     Seconds the client will sleep before the next attempt.
+        error:       The exception that triggered the retry.
+        status_code: HTTP status of the failure, when it was an HTTP error
+                     (``None`` for pure network/transport errors).
+    """
+
+    attempt: int
+    delay_s: float
+    error: BaseException | None
+    status_code: int | None = None
+
+
+OnRetryCallback = Callable[[RetryInfo], None]
 _ENV_KEY = "WARERA_API_KEY"
 
 
@@ -235,6 +260,7 @@ class HttpSession:
         event_hooks: dict[str, list[Any]] | None = None,
         headers: dict[str, str] | None = None,
         retryable_status_codes: set[int] | list[int] | tuple[int, ...] | None = None,
+        on_retry: OnRetryCallback | None = None,
     ) -> None:
         # Resolve API key: explicit arg > env var > None
         self._api_key: str | None = api_key or os.environ.get(_ENV_KEY)
@@ -252,6 +278,7 @@ class HttpSession:
         self._auto_batch_delay = auto_batch_delay
         self._event_hooks = event_hooks or {}
         self._custom_headers = headers or {}
+        self._on_retry = on_retry
         self._swr_cache = SWRCache()
         self._retryable_status_codes = frozenset(
             retryable_status_codes if retryable_status_codes is not None 
@@ -313,6 +340,34 @@ class HttpSession:
     # static @retry decorator with hardcoded values.
     # ------------------------------------------------------------------
 
+    def _make_before_sleep(self) -> Callable[[Any], None]:
+        """
+        Build the tenacity ``before_sleep`` hook: always debug-log the retry,
+        and additionally invoke the user's ``on_retry`` callback when set.
+        """
+        log_cb = before_sleep_log(logger, logging.DEBUG)
+        on_retry = self._on_retry
+        if on_retry is None:
+            return log_cb
+
+        def combined(retry_state: Any) -> None:
+            log_cb(retry_state)
+            exc = retry_state.outcome.exception() if retry_state.outcome else None
+            delay = float(retry_state.next_action.sleep) if retry_state.next_action else 0.0
+            info = RetryInfo(
+                attempt=retry_state.attempt_number,
+                delay_s=delay,
+                error=exc,
+                status_code=getattr(exc, "status_code", None),
+            )
+            try:
+                on_retry(info)
+            except Exception:
+                # A user callback must never break the retry loop itself.
+                logger.exception("on_retry callback raised; ignoring")
+
+        return combined
+
     def _retrying(self) -> AsyncRetrying:
         """Return a new AsyncRetrying instance configured from this session's params."""
         wait_cls = wait_random_exponential if self._jitter else wait_exponential
@@ -324,7 +379,7 @@ class HttpSession:
                 exp_base=self._backoff_multiplier,
                 max=self._max_delay,
             ),
-            before_sleep=before_sleep_log(logger, logging.DEBUG),
+            before_sleep=self._make_before_sleep(),
             reraise=True,
         )
 

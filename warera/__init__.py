@@ -35,6 +35,7 @@ from ._enums import (
     TransactionType,
     UpgradeType,
 )
+from ._http import RetryInfo
 from .client import WareraClient
 from .exceptions import (
     WareraBatchError,
@@ -238,6 +239,7 @@ __all__ = [
     "set_api_key",
     "get_client",
     "validate_api_key",
+    "RetryInfo",
     # Exceptions
     "WareraError",
     "WareraHTTPError",
