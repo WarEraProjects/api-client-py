@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..models.common import ReprMixin
 from ..models.item_trading import ItemOffer, ItemPrice, TradingOrder
 from ._base import BaseResource
 
 
-class PublicOrdersSummary:
+class PublicOrdersSummary(ReprMixin):
     """
     Summary of all public trading orders for a country's market owner.
 
@@ -30,13 +31,6 @@ class PublicOrdersSummary:
         ]
         self.total_buy_money_invested: float = float(raw.get("totalBuyMoneyInvested", 0))
         self.total_sell_quantities: dict[str, float] = raw.get("totalSellQuantities", {})
-
-    def __repr__(self) -> str:
-        return (
-            f"PublicOrdersSummary(buy={len(self.buy_orders)}, "
-            f"sell={len(self.sell_orders)}, "
-            f"invested={self.total_buy_money_invested})"
-        )
 
 
 class ItemTradingResource(BaseResource):

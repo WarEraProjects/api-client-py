@@ -24,17 +24,47 @@ class WareraHTTPError(WareraError):
 
 
 class WareraUnauthorizedError(WareraHTTPError):
-    """HTTP 401 — missing or invalid X-API-Key."""
+    """
+    HTTP 401 — missing or invalid X-API-Key.
 
-    def __init__(self, response_body: Any = None) -> None:
-        super().__init__(401, "Unauthorized — check your X-API-Key", response_body)
+    ``api_key_configured`` tells you which case you are in:
+      • False — the request was sent without any API key (none configured).
+      • True  — a key was sent but the server rejected it.
+      • None  — unknown (error not raised by the HTTP layer).
+    """
+
+    def __init__(
+        self, response_body: Any = None, api_key_configured: bool | None = None
+    ) -> None:
+        self.api_key_configured = api_key_configured
+        if api_key_configured is False:
+            message = (
+                "Unauthorized — this endpoint requires authentication and no API key "
+                "is configured. Set the WARERA_API_KEY environment variable, pass "
+                "api_key=... to WareraClient, or call warera.set_api_key()."
+            )
+        elif api_key_configured:
+            message = (
+                "Unauthorized — the configured API key was rejected by the server. "
+                "Verify it is correct and still active "
+                "(you can check with `await warera.validate_api_key()`)."
+            )
+        else:
+            message = "Unauthorized — check your X-API-Key"
+        super().__init__(401, message, response_body)
 
 
 class WareraForbiddenError(WareraHTTPError):
     """HTTP 403 — authenticated but not allowed."""
 
     def __init__(self, response_body: Any = None) -> None:
-        super().__init__(403, "Forbidden", response_body)
+        super().__init__(
+            403,
+            "Forbidden — your API key does not grant access to this resource. "
+            "Some endpoints (e.g. work stats, action logs) only return data "
+            "for the key owner's own account.",
+            response_body,
+        )
 
 
 class WareraNotFoundError(WareraHTTPError):
@@ -92,10 +122,12 @@ class WareraBatchError(WareraError):
         super().__init__(f"Batch request had {len(failed)} failure(s) at indices: {failed}")
 
 
-def _raise_for_status(status_code: int, response_body: Any) -> None:
+def _raise_for_status(
+    status_code: int, response_body: Any, *, api_key_configured: bool | None = None
+) -> None:
     """Convert an HTTP status code into the appropriate WareraHTTPError."""
     if status_code == 401:
-        raise WareraUnauthorizedError(response_body)
+        raise WareraUnauthorizedError(response_body, api_key_configured=api_key_configured)
     if status_code == 403:
         raise WareraForbiddenError(response_body)
     if status_code == 404:

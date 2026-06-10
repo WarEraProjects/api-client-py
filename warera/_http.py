@@ -56,7 +56,7 @@ from .exceptions import (
 logger = logging.getLogger("warera.http")
 
 # Public constant so client.py can import it instead of duplicating the string.
-DEFAULT_BASE_URL = "https://apidev.warera.io/trpc"
+DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
 _ENV_KEY = "WARERA_API_KEY"
 
 
@@ -529,8 +529,7 @@ class HttpSession:
     # Response parsing helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _check_response(resp: httpx.Response) -> None:
+    def _check_response(self, resp: httpx.Response) -> None:
         """Raise the appropriate WareraHTTPError for non-2xx responses."""
         if resp.status_code < 400:
             return
@@ -553,10 +552,9 @@ class HttpSession:
             body = _orjson.loads(resp.content) if _orjson is not None else resp.json()
         except Exception:
             body = resp.text
-        _raise_for_status(resp.status_code, body)
+        _raise_for_status(resp.status_code, body, api_key_configured=bool(self._api_key))
 
-    @staticmethod
-    def _unwrap_single(resp: httpx.Response, procedure: str) -> Any:
+    def _unwrap_single(self, resp: httpx.Response, procedure: str) -> Any:
         """
         tRPC single response shape:
           { "result": { "data": <payload> } }
@@ -571,15 +569,14 @@ class HttpSession:
         if "error" in data:
             err = data["error"]
             code = err.get("data", {}).get("httpStatus", 500)
-            _raise_for_status(code, err)
+            _raise_for_status(code, err, api_key_configured=bool(self._api_key))
 
         try:
             return data["result"]["data"]
         except (KeyError, TypeError) as exc:
             raise ValueError(f"Unexpected tRPC response shape from {procedure}: {data}") from exc
 
-    @staticmethod
-    def _unwrap_batch(raw_list: list[dict[str, Any]], procedures: list[str]) -> list[Any]:
+    def _unwrap_batch(self, raw_list: list[dict[str, Any]], procedures: list[str]) -> list[Any]:
         """
         tRPC batch response shape:
           [
@@ -599,7 +596,7 @@ class HttpSession:
                 err = item["error"]
                 code = err.get("data", {}).get("httpStatus", 500)
                 try:
-                    _raise_for_status(code, err)
+                    _raise_for_status(code, err, api_key_configured=bool(self._api_key))
                 except WareraHTTPError as e:
                     errors[i] = e
             else:

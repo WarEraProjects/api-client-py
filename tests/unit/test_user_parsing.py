@@ -68,3 +68,34 @@ def test_user_parsing_from_sample():
     assert user_lite.id == "mock_user_id"
     assert user_lite.leveling.level == 10
     assert user_lite.stats.damages_count == 100
+
+
+def test_user_parses_dict_shaped_skin_keys_and_tours():
+    """
+    Regression test: the live API returns `equippedSkinKeys` as a string→string
+    map and `finishedTours` as a string→bool map. v0.1.x typed these as
+    list[str], forcing downstream consumers to monkey-patch the raw response.
+    """
+    data = {
+        "_id": "mock_user_id",
+        "username": "mock_user",
+        "equippedSkinKeys": {
+            "pants": "valentinePants2",
+            "rifle": "1kSubRifle",
+            "tank": "hamsterTank",
+            "helmet": "birthday1YearBetaHelmet",
+        },
+        "finishedTours": {
+            "battle": True,
+            "military": True,
+            "economic": True,
+            "onboarding": True,
+        },
+    }
+    user = User.model_validate(data)
+    assert user.equipped_skin_keys["rifle"] == "1kSubRifle"
+    assert user.finished_tours["onboarding"] is True
+
+    # Empty maps and absent fields must also parse.
+    assert User.model_validate({"_id": "u2", "equippedSkinKeys": {}, "finishedTours": {}}).id == "u2"
+    assert User.model_validate({"_id": "u3"}).finished_tours is None

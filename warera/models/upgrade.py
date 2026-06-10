@@ -1,17 +1,30 @@
 from __future__ import annotations
 
+from pydantic import AliasChoices, Field
+
 from .common import WareraModel
 
 
 class Upgrade(WareraModel):
-    id: str | None = None
-    type: str | None = None
+    upgrade_type: str | None = None
     level: int | None = None
-    entity_id: str | None = None
-    entity_type: str | None = None  # "region" | "company" | "mu"
-    region_id: str | None = None
-    company_id: str | None = None
-    mu_id: str | None = None
-    max_level: int | None = None
-    cost: float | None = None
-    built_at: str | None = None
+    status: str | None = None
+    status_changed_at: str | None = None
+    region_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("region", "regionId", "region_id")
+    )
+    company_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("company", "companyId", "company_id")
+    )
+    mu_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("mu", "muId", "mu_id")
+    )
+    invested_money: float | None = None
+    invested_concrete: float | None = None
+    invested_steel: float | None = None
+    dependant_users_count: int | None = None
+    last_upgrade_at: str | None = None
+    last_downgrade_at: str | None = None
+    will_be_active_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None

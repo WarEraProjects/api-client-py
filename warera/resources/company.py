@@ -5,12 +5,12 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
-from ..models.common import CursorPage
+from ..models.common import CursorPage, ReprMixin
 from ..models.company import Company
 from ._base import BaseResource
 
 
-class CompanyProductionBonus:
+class CompanyProductionBonus(ReprMixin):
     """Production bonus breakdown for a company."""
 
     __slots__ = (
@@ -45,14 +45,8 @@ class CompanyProductionBonus:
             total=float(raw.get("total", 0)),
         )
 
-    def __repr__(self) -> str:
-        return (
-            f"CompanyProductionBonus(total={self.total}, strategic={self.strategic_bonus}, "
-            f"deposit={self.deposit_bonus})"
-        )
 
-
-class RecommendedRegion:
+class RecommendedRegion(ReprMixin):
     """A recommended region for production of a given item."""
 
     __slots__ = (
@@ -77,9 +71,6 @@ class RecommendedRegion:
         self.tax_percent: float = float(raw.get("taxPercent", 0))
         self.deposit_end_at: str | None = raw.get("depositEndAt")
         self.item_code: str | None = raw.get("itemCode")
-
-    def __repr__(self) -> str:
-        return f"RecommendedRegion(region_id={self.region_id!r}, bonus={self.bonus})"
 
 
 class CompanyResource(BaseResource):

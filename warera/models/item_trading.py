@@ -12,11 +12,11 @@ class ItemPrice(WareraModel):
 
 
 class TradingOrder(WareraModel):
-    id: str | None = None
     item_code: str | None = None
     price: float | None = None
     quantity: int | None = None
     order_type: str | None = None  # "buy" | "sell"
+    country: str | None = None
     country_id: str | None = None
     user_id: str | None = None
     created_at: str | None = None
@@ -27,7 +27,6 @@ class TradingOrder(WareraModel):
 
 
 class ItemOffer(WareraModel):
-    id: str | None = None
     item_code: str | None = None
     price: float | None = None
     quantity: int | None = None

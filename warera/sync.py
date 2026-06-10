@@ -172,6 +172,18 @@ class WareraClient:
     ) -> _SyncBatchSession:
         return _SyncBatchSession(self._async_client.batch(batch_size, concurrency))
 
+    @property
+    def has_api_key(self) -> bool:
+        """Whether an API key is configured on this client."""
+        return self._async_client.has_api_key
+
+    def validate_api_key(self) -> bool:
+        """
+        Check whether the configured API key is accepted by the server.
+        Returns False when no key is configured or the server rejects it (401).
+        """
+        return cast(bool, _run(self._async_client.validate_api_key()))
+
     def close(self) -> None:
         _run(self._async_client.aclose())
 
@@ -189,12 +201,28 @@ _default_client: WareraClient | None = None
 api_key: str | None = None
 
 
-def set_api_key(key: str) -> None:
-    """Configure the global API key for the module-level sync client."""
+def set_api_key(key: str, *, validate: bool = False) -> None:
+    """
+    Configure the global API key for the module-level sync client.
+
+    Args:
+        key:      The X-API-Key value.
+        validate: When True, immediately test the key against the server and
+                  raise :class:`warera.WareraUnauthorizedError` if rejected.
+    """
     global api_key, _default_client
     api_key = key
     if _default_client is not None:
         _default_client._async_client._http._api_key = key
+    if validate and not get_client().validate_api_key():
+        from .exceptions import WareraUnauthorizedError
+
+        raise WareraUnauthorizedError(api_key_configured=True)
+
+
+def validate_api_key() -> bool:
+    """Check whether the configured API key is accepted by the server."""
+    return get_client().validate_api_key()
 
 
 def get_client() -> WareraClient:

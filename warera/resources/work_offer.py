@@ -4,12 +4,12 @@ import typing
 from collections.abc import AsyncIterator
 from typing import Any
 
-from ..models.common import CursorPage
+from ..models.common import CursorPage, ReprMixin
 from ..models.work_offer import WorkOffer
 from ._base import BaseResource
 
 
-class WageRange:
+class WageRange(ReprMixin):
     """Min/max/average wage range."""
 
     __slots__ = ("min", "max", "average")
@@ -19,11 +19,8 @@ class WageRange:
         self.max: float = float(raw.get("max", 0))
         self.average: float = float(raw.get("average", 0))
 
-    def __repr__(self) -> str:
-        return f"WageRange(min={self.min}, max={self.max}, avg={self.average})"
 
-
-class WageStats:
+class WageStats(ReprMixin):
     """
     Result of ``workOffer.getWageStats``.
 
@@ -39,12 +36,6 @@ class WageStats:
         self.top_offer: float = float(raw.get("topOffer", 0))
         self.top_eligible_offer: float = float(raw.get("topEligibleOffer", 0))
         self.top_eligible_offers: list[dict[str, Any]] = raw.get("topEligibleOffers", [])
-
-    def __repr__(self) -> str:
-        return (
-            f"WageStats(top_offer={self.top_offer}, top_eligible={self.top_eligible_offer}, "
-            f"allowed_range={self.allowed_range})"
-        )
 
 
 class WorkOfferResource(BaseResource):
@@ -83,6 +74,7 @@ class WorkOfferResource(BaseResource):
         region_id: str | None = None,
         energy: float | None = None,
         production: float | None = None,
+        level: float | None = None,
         citizenship: str | None = None,
         auto_items: typing.Literal[True],
         max_pages: int | float = float("inf"),
@@ -99,6 +91,7 @@ class WorkOfferResource(BaseResource):
         region_id: str | None = None,
         energy: float | None = None,
         production: float | None = None,
+        level: float | None = None,
         citizenship: str | None = None,
         auto_items: typing.Literal[False] = False,
         max_pages: int | float = float("inf"),
@@ -114,6 +107,7 @@ class WorkOfferResource(BaseResource):
         region_id: str | None = None,
         energy: float | None = None,
         production: float | None = None,
+        level: float | None = None,
         citizenship: str | None = None,
         auto_items: bool = False,
         max_pages: int | float = float("inf"),
@@ -125,6 +119,7 @@ class WorkOfferResource(BaseResource):
         Args:
             energy:      Filter: offers requiring at most this energy.
             production:  Filter: offers with at least this production value.
+            level:       Filter: offers requiring at most this user level.
             citizenship: Filter: offers open to this citizenship.
         """
         if auto_items:
@@ -157,6 +152,7 @@ class WorkOfferResource(BaseResource):
             regionId=region_id,
             energy=energy,
             production=production,
+            level=level,
             citizenship=citizenship,
         )
         return CursorPage.from_raw(raw, WorkOffer)

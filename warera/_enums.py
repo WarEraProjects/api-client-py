@@ -87,6 +87,11 @@ class EventType(StrEnum):  # type: ignore[misc]
     BANKRUPTCY = "bankruptcy"
     ALLIANCE_FORMED = "allianceFormed"
     ALLIANCE_BROKEN = "allianceBroken"
+    ALLIANCE_MEMBER_JOINED = "allianceMemberJoined"
+    ALLIANCE_MEMBER_LEFT = "allianceMemberLeft"
+    ALLIANCE_MEMBER_EXCLUDED = "allianceMemberExcluded"
+    DEFENSIVE_PACT_FORMED = "defensivePactFormed"
+    DEFENSIVE_PACT_BROKEN = "defensivePactBroken"
     REGION_LIBERATED = "regionLiberated"
     STRATEGIC_RESOURCES_RESHUFFLED = "strategicResourcesReshuffled"
     RESISTANCE_INCREASED = "resistanceIncreased"
@@ -160,6 +165,7 @@ class TransactionType(StrEnum):  # type: ignore[misc]
     CRAFT_ITEM = "craftItem"
     DISMANTLE_ITEM = "dismantleItem"
     BATTLE_LOOT = "battleLoot"
+    COUNTRY_MONEY_TRANSFER = "countryMoneyTransfer"
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +182,21 @@ class UpgradeType(StrEnum):  # type: ignore[misc]
     BREAK_ROOM = "breakRoom"
     HEADQUARTERS = "headquarters"
     DORMITORIES = "dormitories"
+
+
+# ---------------------------------------------------------------------------
+# Mercenary Contract Auction
+# ---------------------------------------------------------------------------
+
+
+class MercenaryAuctionStatus(StrEnum):  # type: ignore[misc]
+    ACTIVE = "active"
+    WON = "won"
+    EXPIRED_NO_BIDS = "expiredNoBids"
+    EXPIRED_BATTLE = "expiredBattle"
+    EXPIRED_ROUND = "expiredRound"
+    CANCELLED = "cancelled"
+    TERMINATED = "terminated"
 
 
 # ---------------------------------------------------------------------------

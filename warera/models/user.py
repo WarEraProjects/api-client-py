@@ -44,6 +44,11 @@ class SkillDetail(WareraModel):
     hourly_bar_regen: float | None = None
     total_after_soft_cap: float | None = None
     overflow: float | None = None
+    # Combat modifiers (returned on attack-type skills)
+    ammo_percent: float | None = None
+    buffs_percent: float | None = None
+    debuffs_percent: float | None = None
+    military_rank_percent: float | None = None
 
 
 class UserSkills(WareraModel):
@@ -73,9 +78,11 @@ class UserStatsWealth(WareraModel):
 
 
 class UserStatsCase1ByRarity(WareraModel):
+    common: int | None = None
     uncommon: int | None = None
     rare: int | None = None
-    common: int | None = None
+    epic: int | None = None
+    legendary: int | None = None
 
 
 class UserStatsCase1(WareraModel):
@@ -148,6 +155,15 @@ class UserInfos(WareraModel):
     vice_president_of: str | None = None
 
 
+class UserPreferences(WareraModel):
+    auto_replace_on_break: bool | None = None
+    auto_equip_mode: str | None = None
+    app_font: str | None = None
+    app_pattern: str | None = None
+    locale: str | None = None
+    sfx: bool | None = None
+
+
 class UserLite(WareraModel):
     username: str | None = None
     username_lower: str | None = None
@@ -160,12 +176,14 @@ class UserLite(WareraModel):
     created_at: str | None = None
     updated_at: str | None = None
     email_verified: bool | None = None
-    dates: UserLiteDates | None = None
+    # user.getUserLite returns the full dates object, same as user.getUserById.
+    dates: UserDates | None = None
     leveling: UserLeveling | None = None
     stats: UserStats | None = None
     rankings: UserRankings | None = None
     infos: UserInfos | None = None
     skills: UserSkills | None = None
+    equipped_skin_keys: dict[str, str] | None = None
 
 
 class User(UserLite):
@@ -180,3 +198,5 @@ class User(UserLite):
     equipped_skin_keys: dict[str, str] | None = None
     finished_tours: dict[str, bool] | None = None
     should_update_profile: bool | None = None
+    orgs: list[str] | None = None
+    preferences: UserPreferences | None = None

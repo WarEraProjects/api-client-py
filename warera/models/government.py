@@ -11,7 +11,12 @@ class GovernmentMember(WareraModel):
     party_id: str | None = None
 
 
+class GovernmentDates(WareraModel):
+    announcement_created_ats: list[str] | None = None
+
+
 class Government(WareraModel):
+    dates: GovernmentDates | None = None
     country: str | None = None
     country_id: str | None = None
     president: str | None = None

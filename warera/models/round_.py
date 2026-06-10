@@ -1,28 +1,51 @@
 from __future__ import annotations
 
+from pydantic import AliasChoices, Field
+
 from .common import WareraModel
-
-
-class Round(WareraModel):
-    id: str | None = None
-    battle_id: str | None = None
-    round_number: int | None = None
-    attacker_score: float | None = None
-    defender_score: float | None = None
-    attacker_damage: float | None = None
-    defender_damage: float | None = None
-    winner_side: str | None = None
-    start_time: str | None = None
-    end_time: str | None = None
+from .inventory import Equipment
 
 
 class Hit(WareraModel):
-    """A single hit entry from round.getLastHits."""
+    """A single hit entry (round.getLastHits / round side lastHits)."""
 
-    user_id: str | None = None
-    country_id: str | None = None
-    mu_id: str | None = None
-    side: str | None = None
-    damage: float | None = None
-    weapon: str | None = None
-    timestamp: str | None = None
+    user: str | None = None
+    mu: str | None = None
+    damages: float | None = None
+    is_critical_hit: bool | None = None
+    is_missed: bool | None = None
+    hit_at: str | None = None
+    ammo: str | None = None
+    weapon: Equipment | None = None
+    equipments: list[Equipment] | None = None
+
+
+class RoundSide(WareraModel):
+    """Combat stats of one side (attacker/defender) within a round."""
+
+    country: str | None = None
+    damages: float | None = None
+    points: float | None = None
+    hit_count: int | None = None
+    last_hits: list[Hit] | None = None
+
+
+class RoundLive(WareraModel):
+    ticks_count: int | None = None
+    actual_tick_points: float | None = None
+    next_tick_at: str | None = None
+
+
+class Round(WareraModel):
+    battle_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("battle", "battleId", "battle_id")
+    )
+    round_number: int | None = Field(
+        default=None, validation_alias=AliasChoices("number", "roundNumber", "round_number")
+    )
+    is_active: bool | None = None
+    attacker: RoundSide | None = None
+    defender: RoundSide | None = None
+    live: RoundLive | None = None
+    created_at: str | None = None
+    updated_at: str | None = None

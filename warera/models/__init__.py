@@ -4,18 +4,32 @@ from .battle import Battle, BattleLive
 from .battle_loot_summary import BattleLootPoolItem, BattleLootSummary
 from .battle_order import BattleOrder
 from .battle_ranking import BattleRankingEntry
-from .common import CursorPage, WareraModel
+from .common import CursorPage, ReprMixin, WareraModel
 from .company import Company
-from .country import Country
+from .country import (
+    Country,
+    CountryRankings,
+    CountryStrategicBonuses,
+    CountryStrategicResourceMap,
+    CountryStrategicResources,
+    CountryTaxes,
+    CountryUnrest,
+)
 from .donation import Donation, DonationTotals
 from .election import Election, ElectionCandidate
 from .event import Event
 from .game_config import GameConfig, GameDates
-from .government import Government, GovernmentMember
-from .inventory import Equipment
+from .government import Government, GovernmentDates, GovernmentMember
+from .inventory import Equipment, EquipmentSkills
 from .item_trading import ItemOffer, ItemPrice, TradingOrder
 from .mercenary_contract_auction import MercenaryContractAuction, MercenaryContractAuctionBid
-from .military_unit import MilitaryUnit
+from .military_unit import (
+    MilitaryUnit,
+    MuActiveUpgradeLevels,
+    MuLeveling,
+    MuRankings,
+    MuRoles,
+)
 from .mu_member import MuMember
 from .party import Party, PartyEthics
 from .ranking import RankingEntry
@@ -31,7 +45,18 @@ from .tournament import (
 )
 from .transaction import Transaction
 from .upgrade import Upgrade
-from .user import User, UserLite
+from .user import (
+    RankingDetail,
+    SkillDetail,
+    User,
+    UserDates,
+    UserLeveling,
+    UserLite,
+    UserPreferences,
+    UserRankings,
+    UserSkills,
+    UserStats,
+)
 from .work_offer import WorkOffer
 from .work_stats import WorkStats
 from .worker import Worker, WorkerCount
@@ -48,16 +73,24 @@ __all__ = [
     "BattleRankingEntry",
     "Company",
     "Country",
+    "CountryRankings",
+    "CountryStrategicBonuses",
+    "CountryStrategicResourceMap",
+    "CountryStrategicResources",
+    "CountryTaxes",
+    "CountryUnrest",
     "CursorPage",
     "Donation",
     "DonationTotals",
     "Election",
     "ElectionCandidate",
     "Equipment",
+    "EquipmentSkills",
     "Event",
     "GameConfig",
     "GameDates",
     "Government",
+    "GovernmentDates",
     "GovernmentMember",
     "Hit",
     "ItemOffer",
@@ -65,14 +98,21 @@ __all__ = [
     "MercenaryContractAuction",
     "MercenaryContractAuctionBid",
     "MilitaryUnit",
+    "MuActiveUpgradeLevels",
+    "MuLeveling",
     "MuMember",
+    "MuRankings",
+    "MuRoles",
     "Party",
     "PartyEthics",
+    "RankingDetail",
     "RankingEntry",
     "Region",
+    "ReprMixin",
     "Round",
     "SearchResult",
     "SearchResults",
+    "SkillDetail",
     "Tournament",
     "TournamentMatch",
     "TournamentRegistered",
@@ -82,7 +122,13 @@ __all__ = [
     "Transaction",
     "Upgrade",
     "User",
+    "UserDates",
+    "UserLeveling",
     "UserLite",
+    "UserPreferences",
+    "UserRankings",
+    "UserSkills",
+    "UserStats",
     "WareraModel",
     "WorkOffer",
     "WorkStats",

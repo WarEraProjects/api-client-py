@@ -8,6 +8,7 @@ from .common import WareraModel
 class PartyEthics(WareraModel):
     """Ethics alignment values for a political party."""
 
+    unethical: bool | None = None
     militarism: float | None = None
     isolationism: float | None = None
     imperialism: float | None = None

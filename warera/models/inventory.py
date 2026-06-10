@@ -5,13 +5,23 @@ from typing import Any
 from .common import WareraModel
 
 
+class EquipmentSkills(WareraModel):
+    """Stat bonuses granted by an equipped item."""
+
+    attack: float | None = None
+    armor: float | None = None
+    critical_chance: float | None = None
+    critical_damages: float | None = None
+    dodge: float | None = None
+    precision: float | None = None
+
+
 class Equipment(WareraModel):
     """
     A single equipped item returned by inventory.fetchCurrentEquipment.
 
-    Fields are loosely typed since the exact response schema is not defined
-    in the API spec.  Raw data is always accessible via model's
-    ``__pydantic_extra__`` or ``model_dump()``.
+    The API returns one object keyed by slot (``weapon``, ``helmet``, ...);
+    the resource flattens it into a list of ``Equipment`` with ``slot`` set.
     """
 
     slot: str | None = None
@@ -20,3 +30,11 @@ class Equipment(WareraModel):
     name: str | None = None
     rarity: str | None = None
     stats: dict[str, Any] | None = None
+    # Real per-item fields from the live schema
+    type: str | None = None
+    code: str | None = None
+    skills: EquipmentSkills | None = None
+    state: float | None = None
+    max_state: float | None = None
+    quantity: int | None = None
+    last_acquisition_at: str | None = None

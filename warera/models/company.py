@@ -16,7 +16,6 @@ class CompanyActiveUpgradeLevels(WareraModel):
 
 
 class Company(WareraModel):
-    id: str | None = None
     name: str | None = None
     owner_id: str | None = Field(
         default=None, validation_alias=AliasChoices("owner", "ownerId", "owner_id")

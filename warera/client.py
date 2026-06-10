@@ -210,6 +210,39 @@ class WareraClient:
         await self._http.aclose()
 
     # ------------------------------------------------------------------
+    # Authentication
+    # ------------------------------------------------------------------
+
+    @property
+    def has_api_key(self) -> bool:
+        """Whether an API key is configured on this client."""
+        return bool(self._http._api_key)
+
+    async def validate_api_key(self) -> bool:
+        """
+        Check whether the configured API key is accepted by the server.
+
+        Performs one cheap authenticated request
+        (``transaction.getPaginatedTransactions`` with ``limit=1``).
+
+        Returns:
+            ``True``  — the key is valid.
+            ``False`` — no key is configured, or the server rejected it (401).
+
+        Any other error (network failure, 5xx, ...) propagates so that an
+        outage is not mistaken for an invalid key.
+        """
+        from .exceptions import WareraUnauthorizedError
+
+        if not self.has_api_key:
+            return False
+        try:
+            await self._http.get("transaction.getPaginatedTransactions", {"limit": 1})
+        except WareraUnauthorizedError:
+            return False
+        return True
+
+    # ------------------------------------------------------------------
     # Rate-limit introspection & cumulative stats
     # ------------------------------------------------------------------
 

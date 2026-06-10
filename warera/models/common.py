@@ -26,23 +26,33 @@ def _base_config() -> ConfigDict:
     )
 
 
+class ReprMixin:
+    """
+    Adds a full ``ClassName(field=value, ...)`` repr to plain (non-Pydantic)
+    helper classes, including every attribute from ``__slots__`` or ``__dict__``.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        slots: tuple[str, ...] = getattr(self, "__slots__", ())
+        names = list(slots) if slots else list(getattr(self, "__dict__", {}))
+        fields = ", ".join(f"{n}={getattr(self, n, None)!r}" for n in names)
+        return f"{self.__class__.__name__}({fields})"
+
+
 class WareraModel(BaseModel):
-    """Base class for all response models."""
+    """
+    Base class for all response models.
+
+    Printing any model shows every field and value (Pydantic's default
+    ``field=value`` rendering — no custom truncation).
+    """
 
     model_config = _base_config()
     id: str | None = Field(default=None, alias="_id")
-
-    def __str__(self) -> str:
-        """
-        Generic user-friendly string representation.
-        Shows the class name and the most 'identifying' field found.
-        """
-        # Priority for identifying fields
-        for field_name in ("username", "name", "id"):
-            val = getattr(self, field_name, None)
-            if val is not None:
-                return f"<{self.__class__.__name__} {val}>"
-        return f"<{self.__class__.__name__}>"
+    version: int | None = Field(default=None, alias="__v")
+    """Mongo document version (`__v`), returned by most entity endpoints."""
 
 
 class CursorPage(WareraModel, Generic[T]):
@@ -68,9 +78,6 @@ class CursorPage(WareraModel, Generic[T]):
     def __len__(self) -> int:
         """Return the number of items on this page."""
         return len(self.items)
-
-    def __str__(self) -> str:
-        return f"<CursorPage items={len(self.items)} has_more={self.has_more}>"
 
     @classmethod
     def from_raw(cls, raw: Any, item_type: type[T]) -> CursorPage[T]:

@@ -4,7 +4,6 @@ from .common import WareraModel
 
 
 class WorkOffer(WareraModel):
-    id: str | None = None
     company_id: str | None = None
     region_id: str | None = None
     salary: float | None = None

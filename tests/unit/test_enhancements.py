@@ -8,16 +8,39 @@ from warera.models.common import CursorPage, WareraModel
 from warera.models.user import User
 
 
-def test_warera_model_str():
+def test_warera_model_str_shows_all_fields():
     user = User(_id="123", username="testuser")
-    assert str(user) == "<User testuser>"
+    rendered = str(user)
+    # Pydantic's default rendering: every field is visible, values included.
+    assert "id='123'" in rendered
+    assert "username='testuser'" in rendered
+    assert "leveling=" in rendered
 
-    # Test fallback to ID
     class SimpleModel(WareraModel):
         pass
 
     m = SimpleModel(_id="999")
-    assert str(m) == "<SimpleModel 999>"
+    assert "id='999'" in str(m)
+    assert "SimpleModel" in repr(m)
+
+
+def test_repr_mixin_shows_all_attributes():
+    from warera.resources.company import CompanyProductionBonus
+    from warera.resources.work_offer import WageRange
+
+    bonus = CompanyProductionBonus.from_raw({"strategicBonus": 1, "total": 5})
+    rendered = repr(bonus)
+    for field in (
+        "strategic_bonus",
+        "deposit_bonus",
+        "ethic_specialization_bonus",
+        "ethic_deposit_bonus",
+        "total",
+    ):
+        assert field in rendered
+
+    wage = WageRange({"min": 1, "max": 2, "average": 1.5})
+    assert repr(wage) == "WageRange(min=1.0, max=2.0, average=1.5)"
 
 
 def test_cursor_page_iter_and_len():

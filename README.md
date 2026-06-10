@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> A robust, fully-typed, async-first Python client for the [WarEra](https://warera.io) tRPC API (v0.24.5-beta).
+> A robust, fully-typed, async-first Python client for the [WarEra](https://warera.io) tRPC API (v0.25.0-beta).
 > 
 > **⚠️ Upgrading from v0.1.x?** Please read the [v0.2.0 Migration Guide](MIGRATION-0.2.0.md).
 > 

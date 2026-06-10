@@ -14,4 +14,7 @@ class RankingEntry(WareraModel):
         default=None, validation_alias=AliasChoices("country", "countryId", "country_id")
     )
     value: float | None = None
+    tier: str | None = None
+    user: str | None = None
+    mu: str | None = None
     image: str | None = None

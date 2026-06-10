@@ -114,6 +114,7 @@ from warera._enums import (
     BattleRankingDataType,
     BattleRankingSide,
     EventType,
+    MercenaryAuctionStatus,
     RankingType,
     TransactionType,
     UpgradeType,
@@ -153,14 +154,33 @@ class TestEnums(unittest.TestCase):
     def test_ranking_type_has_33_values(self):
         self.assertEqual(len(RankingType), 33)
 
-    def test_event_type_has_21_values(self):
-        self.assertEqual(len(EventType), 21)
+    def test_event_type_has_26_values(self):
+        self.assertEqual(len(EventType), 26)
+        values = {e.value for e in EventType}
+        self.assertIn("allianceMemberJoined", values)
+        self.assertIn("allianceMemberLeft", values)
+        self.assertIn("allianceMemberExcluded", values)
+        self.assertIn("defensivePactFormed", values)
+        self.assertIn("defensivePactBroken", values)
 
     def test_transaction_type_values(self):
         values = {e.value for e in TransactionType}
         self.assertIn("applicationFee", values)
         self.assertIn("dismantleItem", values)
         self.assertIn("battleLoot", values)
+        self.assertIn("countryMoneyTransfer", values)
+
+    def test_mercenary_auction_status_values(self):
+        expected = {
+            "active",
+            "won",
+            "expiredNoBids",
+            "expiredBattle",
+            "expiredRound",
+            "cancelled",
+            "terminated",
+        }
+        self.assertEqual({e.value for e in MercenaryAuctionStatus}, expected)
 
     def test_upgrade_type_values(self):
         values = {e.value for e in UpgradeType}
@@ -319,7 +339,7 @@ class TestHttpEncoding(unittest.TestCase):
         from warera._http import HttpSession  # noqa: PLC0415
 
         resp = _FakeResponse(200, {"result": {"data": {"id": "1", "name": "TestCo"}}})
-        result = HttpSession._unwrap_single(resp, "company.getById")
+        result = HttpSession(base_url="https://test")._unwrap_single(resp, "company.getById")
         self.assertEqual(result, {"id": "1", "name": "TestCo"})
 
     def test_unwrap_single_trpc_error_raises(self):
@@ -327,7 +347,7 @@ class TestHttpEncoding(unittest.TestCase):
 
         resp = _FakeResponse(200, {"error": {"message": "Not found", "data": {"httpStatus": 404}}})
         with self.assertRaises(WareraNotFoundError):
-            HttpSession._unwrap_single(resp, "company.getById")
+            HttpSession(base_url="https://test")._unwrap_single(resp, "company.getById")
 
     def test_unwrap_batch_all_ok(self):
         from warera._http import HttpSession  # noqa: PLC0415
@@ -336,7 +356,9 @@ class TestHttpEncoding(unittest.TestCase):
             {"result": {"data": {"id": "1"}}},
             {"result": {"data": {"id": "2"}}},
         ]
-        results = HttpSession._unwrap_batch(raw, ["company.getById", "company.getById"])
+        results = HttpSession(base_url="https://test")._unwrap_batch(
+            raw, ["company.getById", "company.getById"]
+        )
         self.assertEqual(results, [{"id": "1"}, {"id": "2"}])
 
     def test_unwrap_batch_partial_failure_raises_batch_error(self):
@@ -347,7 +369,9 @@ class TestHttpEncoding(unittest.TestCase):
             {"error": {"message": "Not found", "data": {"httpStatus": 404}}},
         ]
         with self.assertRaises(WareraBatchError) as ctx:
-            HttpSession._unwrap_batch(raw, ["company.getById", "company.getById"])
+            HttpSession(base_url="https://test")._unwrap_batch(
+                raw, ["company.getById", "company.getById"]
+            )
         err = ctx.exception
         self.assertIn(1, err.errors)
         self.assertIn(0, err.results)

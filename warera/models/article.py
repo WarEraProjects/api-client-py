@@ -15,7 +15,6 @@ class ArticleStats(WareraModel):
 
 
 class Article(WareraModel):
-    id: str | None = None
     title: str | None = None
     content: str | None = None
     author_id: str | None = None
@@ -31,13 +30,14 @@ class Article(WareraModel):
     author: str | None = None
     is_deleted: bool | None = None
     is_published: bool | None = None
+    is_public: bool | None = None
+    slug: str | None = None
     published_at: str | None = None
     stats: ArticleStats | None = None
     updated_at: str | None = None
 
 
 class ArticleLite(WareraModel):
-    id: str | None = None
     title: str | None = None
     author_id: str | None = None
     country_id: str | None = None
@@ -52,6 +52,8 @@ class ArticleLite(WareraModel):
     content: str | None = None
     is_deleted: bool | None = None
     is_published: bool | None = None
+    is_public: bool | None = None
+    slug: str | None = None
     published_at: str | None = None
     stats: ArticleStats | None = None
     updated_at: str | None = None

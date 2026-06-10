@@ -398,3 +398,75 @@ async def test_http_session_retries_on_5xx():
     assert call_count == 3
     assert res == {"success": True}
 
+
+
+# ---------------------------------------------------------------------------
+# Auth handling
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_401_without_key_explains_missing_key(monkeypatch):
+    monkeypatch.delenv("WARERA_API_KEY", raising=False)
+    respx.get(url__startswith=BASE).mock(return_value=httpx.Response(401, json={}))
+
+    async with HttpSession(base_url=BASE) as session:
+        with pytest.raises(WareraUnauthorizedError) as exc_info:
+            await session.get("transaction.getPaginatedTransactions", {"limit": 1})
+
+    err = exc_info.value
+    assert err.api_key_configured is False
+    assert "no API key is configured" in str(err)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_401_with_key_explains_rejected_key():
+    respx.get(url__startswith=BASE).mock(return_value=httpx.Response(401, json={}))
+
+    async with HttpSession(base_url=BASE, api_key="bad-key") as session:
+        with pytest.raises(WareraUnauthorizedError) as exc_info:
+            await session.get("transaction.getPaginatedTransactions", {"limit": 1})
+
+    err = exc_info.value
+    assert err.api_key_configured is True
+    assert "rejected" in str(err)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_validate_api_key_true_on_success():
+    from warera.client import WareraClient
+
+    respx.get(url__startswith=BASE).mock(
+        return_value=httpx.Response(200, json=_make_trpc_ok({"items": []}))
+    )
+    async with WareraClient(api_key="good-key", base_url=BASE) as client:
+        assert client.has_api_key is True
+        assert await client.validate_api_key() is True
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_validate_api_key_false_on_401():
+    from warera.client import WareraClient
+
+    respx.get(url__startswith=BASE).mock(return_value=httpx.Response(401, json={}))
+    async with WareraClient(api_key="bad-key", base_url=BASE) as client:
+        assert await client.validate_api_key() is False
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_validate_api_key_false_without_key_and_no_request(monkeypatch):
+    monkeypatch.delenv("WARERA_API_KEY", raising=False)
+    from warera.client import WareraClient
+
+    route = respx.get(url__startswith=BASE).mock(
+        return_value=httpx.Response(200, json=_make_trpc_ok({"items": []}))
+    )
+    async with WareraClient(base_url=BASE) as client:
+        assert client.has_api_key is False
+        assert await client.validate_api_key() is False
+    assert not route.called

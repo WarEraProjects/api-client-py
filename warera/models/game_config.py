@@ -16,14 +16,20 @@ from .common import WareraModel
 class BadgeRewardWithPreserve(WareraModel):
     preserve_between_reset: bool | None = Field(default=None, alias="preserveBetweenReset")
     reward: float | None = Field(default=None, alias="reward")
+    availabilities: list[str] | None = Field(default=None, alias="availabilities")
+    cooldown_days: int | None = Field(default=None, alias="cooldownDays")
 
 class BadgeReward(WareraModel):
     reward: float | None = Field(default=None, alias="reward")
+    availabilities: list[str] | None = Field(default=None, alias="availabilities")
+    cooldown_days: int | None = Field(default=None, alias="cooldownDays")
 
 class BadgeRewardWithMetadata(WareraModel):
     preserve_between_reset: bool | None = Field(default=None, alias="preserveBetweenReset")
     reward: float | None = Field(default=None, alias="reward")
     unique_metadata_key: str | None = Field(default=None, alias="uniqueMetadataKey")
+    availabilities: list[str] | None = Field(default=None, alias="availabilities")
+    cooldown_days: int | None = Field(default=None, alias="cooldownDays")
 
 class GameConfigBadges(WareraModel):
     alpha_tester: BadgeRewardWithPreserve | None = Field(default=None, alias="alphaTester")
@@ -33,11 +39,14 @@ class GameConfigBadges(WareraModel):
     bug_finder: BadgeRewardWithPreserve | None = Field(default=None, alias="bugFinder")
     coffee: BadgeRewardWithPreserve | None = Field(default=None, alias="coffee")
     congress_member: BadgeReward | None = Field(default=None, alias="congressMember")
+    council_member: BadgeRewardWithPreserve | None = Field(default=None, alias="councilMember")
     country_president: BadgeReward | None = Field(default=None, alias="countryPresident")
     country_tournament_winner: BadgeRewardWithPreserve | None = Field(default=None, alias="countryTournamentWinner")
+    exploit_finder: BadgeRewardWithPreserve | None = Field(default=None, alias="exploitFinder")
     founding_father: BadgeRewardWithPreserve | None = Field(default=None, alias="foundingFather")
     gift_premium: BadgeRewardWithPreserve | None = Field(default=None, alias="giftPremium")
     giveaway_winner: BadgeReward | None = Field(default=None, alias="giveawayWinner")
+    gov_member: BadgeRewardWithPreserve | None = Field(default=None, alias="govMember")
     hard_worker: BadgeReward | None = Field(default=None, alias="hardWorker")
     mu_tournament_winner: BadgeRewardWithPreserve | None = Field(default=None, alias="muTournamentWinner")
     popular_article: BadgeRewardWithMetadata | None = Field(default=None, alias="popularArticle")
@@ -79,6 +88,8 @@ class GameConfigBattle(WareraModel):
     set_mu_order_money_cost: float | None = Field(default=None, alias="setMuOrderMoneyCost")
     set_order_money_cost: float | None = Field(default=None, alias="setOrderMoneyCost")
     tick_points: BattleTickPoints | None = Field(default=None, alias="tickPoints")
+    gov_member_bounty_reward_percent: float | None = Field(default=None, alias="govMemberBountyRewardPercent")
+    rankings_loot_percent_per_1k_dmg: float | None = Field(default=None, alias="rankingsLootPercentPer1kDmg")
 
 class GameConfigCitizenshipApplication(WareraModel):
     auto_approval_enabled: bool | None = Field(default=None, alias="autoApprovalEnabled")
@@ -101,9 +112,17 @@ class GameConfigElection(WareraModel):
     election_vote_duration_hours: int | None = Field(default=None, alias="electionVoteDurationHours")
     vote_min_level: int | None = Field(default=None, alias="voteMinLevel")
 
+class GameConfigGovernmentAnnouncement(WareraModel):
+    max_per_hour: int | None = Field(default=None, alias="maxPerHour")
+    duration_hours: int | None = Field(default=None, alias="durationHours")
+
 class GameConfigGovernment(WareraModel):
     resistance_decreased_cooldown_in_hours: int | None = Field(default=None, alias="resistanceDecreasedCooldownInHours")
     resistance_increased_cooldown_in_hours: int | None = Field(default=None, alias="resistanceIncreasedCooldownInHours")
+    announcement: GameConfigGovernmentAnnouncement | None = Field(default=None, alias="announcement")
+    member_wage_percent: float | None = Field(default=None, alias="memberWagePercent")
+    president_wage_percent: float | None = Field(default=None, alias="presidentWagePercent")
+    nomination_cooldown_days: int | None = Field(default=None, alias="nominationCooldownDays")
 
 class ItemFlatStatsPercentAttack(WareraModel):
     percent_attack: float | None = Field(default=None, alias="percentAttack")
@@ -136,6 +155,7 @@ class ItemBoots(WareraModel):
 
 class ItemFlatStatsHealthRegen(WareraModel):
     health_regen: float | None = Field(default=None, alias="healthRegen")
+    health_regen_percent: float | None = Field(default=None, alias="healthRegenPercent")
 
 class ItemIconComponent(WareraModel):
     compare: Any | None = Field(default=None, alias="compare")
@@ -147,6 +167,7 @@ class ItemBread(WareraModel):
     code: str | None = Field(default=None, alias="code")
     flat_stats: ItemFlatStatsHealthRegen | None = Field(default=None, alias="flatStats")
     icon_component: ItemIconComponent | None = Field(default=None, alias="IconComponent")
+    icon_img: str | None = Field(default=None, alias="iconImg")
     is_consumable: bool | None = Field(default=None, alias="isConsumable")
     is_tradable: bool | None = Field(default=None, alias="isTradable")
     production_needs: ItemProductionNeedsGrain | None = Field(default=None, alias="productionNeeds")
@@ -334,6 +355,28 @@ class ItemSteel(WareraModel):
     rarity: str | None = Field(default=None, alias="rarity")
     type: str | None = Field(default=None, alias="type")
 
+class ItemWood(WareraModel):
+    climates: list[str] | None = Field(default=None, alias="climates")
+    code: str | None = Field(default=None, alias="code")
+    icon_component: ItemIconComponent | None = Field(default=None, alias="IconComponent")
+    is_deposit: bool | None = Field(default=None, alias="isDeposit")
+    is_tradable: bool | None = Field(default=None, alias="isTradable")
+    production_points: int | None = Field(default=None, alias="productionPoints")
+    rarity: str | None = Field(default=None, alias="rarity")
+    type: str | None = Field(default=None, alias="type")
+
+class ItemProductionNeedsWood(WareraModel):
+    wood: float | None = Field(default=None, alias="wood")
+
+class ItemPaper(WareraModel):
+    code: str | None = Field(default=None, alias="code")
+    icon_component: ItemIconComponent | None = Field(default=None, alias="IconComponent")
+    is_tradable: bool | None = Field(default=None, alias="isTradable")
+    production_needs: ItemProductionNeedsWood | None = Field(default=None, alias="productionNeeds")
+    production_points: int | None = Field(default=None, alias="productionPoints")
+    rarity: str | None = Field(default=None, alias="rarity")
+    type: str | None = Field(default=None, alias="type")
+
 class GameConfigItems(WareraModel):
     ammo: ItemAmmo | None = Field(default=None, alias="ammo")
     boots1: ItemBoots | None = Field(default=None, alias="boots1")
@@ -379,6 +422,7 @@ class GameConfigItems(WareraModel):
     limestone: ItemRawResource | None = Field(default=None, alias="limestone")
     livestock: ItemDepositResource | None = Field(default=None, alias="livestock")
     oil: ItemOil | None = Field(default=None, alias="oil")
+    paper: ItemPaper | None = Field(default=None, alias="paper")
     pants1: ItemChestOrPants | None = Field(default=None, alias="pants1")
     pants2: ItemChestOrPants | None = Field(default=None, alias="pants2")
     pants3: ItemChestOrPants | None = Field(default=None, alias="pants3")
@@ -392,6 +436,7 @@ class GameConfigItems(WareraModel):
     steak: ItemSteak | None = Field(default=None, alias="steak")
     steel: ItemSteel | None = Field(default=None, alias="steel")
     tank: ItemWeaponMeleeOrHeavy | None = Field(default=None, alias="tank")
+    wood: ItemWood | None = Field(default=None, alias="wood")
 
 class LawActionCostAndMaintenance(WareraModel):
     cost: float | None = Field(default=None, alias="cost")
@@ -400,10 +445,18 @@ class LawActionCostAndMaintenance(WareraModel):
 class LawActionCost(WareraModel):
     cost: float | None = Field(default=None, alias="cost")
 
+class LawSendMoneyToCountry(WareraModel):
+    alliance_tax_rate: float | None = Field(default=None, alias="allianceTaxRate")
+    external_tax_rate: float | None = Field(default=None, alias="externalTaxRate")
+
 class GameConfigLaw(WareraModel):
     abusive_law_possible_voters_needed: float | None = Field(default=None, alias="abusiveLawPossibleVotersNeeded")
     abusive_laws_cooldown_in_days: int | None = Field(default=None, alias="abusiveLawsCooldownInDays")
     accept_alliance: LawActionCostAndMaintenance | None = Field(default=None, alias="accept_alliance")
+    accept_join_alliance: LawActionCostAndMaintenance | None = Field(default=None, alias="accept_join_alliance")
+    create_alliance: LawActionCostAndMaintenance | None = Field(default=None, alias="create_alliance")
+    leave_alliance: LawActionCostAndMaintenance | None = Field(default=None, alias="leave_alliance")
+    send_money_to_country: LawSendMoneyToCountry | None = Field(default=None, alias="sendMoneyToCountry")
     define_enemy_country: LawActionCostAndMaintenance | None = Field(default=None, alias="define_enemy_country")
     law_votes_duration_hours: int | None = Field(default=None, alias="lawVotesDurationHours")
     propose_alliance: LawActionCostAndMaintenance | None = Field(default=None, alias="propose_alliance")
@@ -467,6 +520,7 @@ class GameConfigMu(WareraModel):
     move_cost: float | None = Field(default=None, alias="moveCost")
 
 class GameConfigNewspaper(WareraModel):
+    comment_min_level: int | None = Field(default=None, alias="commentMinLevel")
     create_article_min_level: int | None = Field(default=None, alias="createArticleMinLevel")
     gem_tip_value: float | None = Field(default=None, alias="gemTipValue")
     publish_cost: float | None = Field(default=None, alias="publishCost")
@@ -498,6 +552,9 @@ class GameConfigRegion(WareraModel):
     deplete_hourly_percent: float | None = Field(default=None, alias="depleteHourlyPercent")
     increase_by: float | None = Field(default=None, alias="increaseBy")
     increase_resistance_cost: float | None = Field(default=None, alias="increaseResistanceCost")
+    liberation_days_cooldown: int | None = Field(default=None, alias="liberationDaysCooldown")
+    non_aggression_hours_after_liberation: int | None = Field(default=None, alias="nonAggressionHoursAfterLiberation")
+    non_aggression_hours_after_peace: int | None = Field(default=None, alias="nonAggressionHoursAfterPeace")
     max_daily_resistance: int | None = Field(default=None, alias="maxDailyResistance")
     max_resistance: int | None = Field(default=None, alias="maxResistance")
     min_daily_resistance: int | None = Field(default=None, alias="minDailyResistance")
@@ -546,6 +603,9 @@ class SkillLevels(WareraModel):
 
 class SkillTrack(WareraModel):
     levels: SkillLevels | None = Field(default=None, alias="levels")
+    soft_cap: float | None = Field(default=None, alias="softCap")
+    skill_overflow: str | None = Field(default=None, alias="skillOverflow")
+    skill_overflow_value: float | None = Field(default=None, alias="skillOverflowValue")
 
 class BarSkillLevelZero(WareraModel):
     is_a_bar: bool | None = Field(default=None, alias="isABar")
@@ -811,6 +871,7 @@ class GameConfigUser(WareraModel):
     equipment_sets: UserEquipmentSets | None = Field(default=None, alias="equipmentSets")
     fields_to_populate: str | None = Field(default=None, alias="fieldsToPopulate")
     is_inactive_after_days: int | None = Field(default=None, alias="isInactiveAfterDays")
+    kits: UserEquipmentSets | None = Field(default=None, alias="kits")
     market_min_level: int | None = Field(default=None, alias="marketMinLevel")
     max_construction_points: int | None = Field(default=None, alias="maxConstructionPoints")
     max_energy: int | None = Field(default=None, alias="maxEnergy")
@@ -825,7 +886,52 @@ class GameConfigWorker(WareraModel):
     fidelity_production_bonus_percent: float | None = Field(default=None, alias="fidelityProductionBonusPercent")
     max_fidelity: int | None = Field(default=None, alias="maxFidelity")
 
+class GameConfigAlliance(WareraModel):
+    leave_cooldown_days: int | None = Field(default=None, alias="leaveCooldownDays")
+
+class GameConfigLoot(WareraModel):
+    weapon_chance_percent: float | None = Field(default=None, alias="weaponChancePercent")
+    damage_per_loot_item: float | None = Field(default=None, alias="damagePerLootItem")
+    battle_loot_damage_per_loot_item: float | None = Field(default=None, alias="battleLootDamagePerLootItem")
+
+class MercenaryAuctionConfig(WareraModel):
+    min_duration: float | None = Field(default=None, alias="minDuration")
+    max_duration: float | None = Field(default=None, alias="maxDuration")
+    max_per_k_multiplier: float | None = Field(default=None, alias="maxPerKMultiplier")
+    min_per_k: float | None = Field(default=None, alias="minPerK")
+    bid_step: float | None = Field(default=None, alias="bidStep")
+    timer_extension_threshold: float | None = Field(default=None, alias="timerExtensionThreshold")
+    timer_extension_amount: float | None = Field(default=None, alias="timerExtensionAmount")
+    max_damage_per_contract: float | None = Field(default=None, alias="maxDamagePerContract")
+
+class MercenaryReputationConfig(WareraModel):
+    professionals_only_threshold: float | None = Field(default=None, alias="professionalsOnlyThreshold")
+    success_per_dollar: float | None = Field(default=None, alias="successPerDollar")
+    failure_per_dollar: float | None = Field(default=None, alias="failurePerDollar")
+    failure_per_damage: float | None = Field(default=None, alias="failurePerDamage")
+    weekly_decay_percent: float | None = Field(default=None, alias="weeklyDecayPercent")
+    negative_buy_cost: float | None = Field(default=None, alias="negativeBuyCost")
+    negative_buy_amount: float | None = Field(default=None, alias="negativeBuyAmount")
+    negative_buy_cooldown_hours: float | None = Field(default=None, alias="negativeBuyCooldownHours")
+
+class GameConfigMercenaryContract(WareraModel):
+    enabled: bool | None = Field(default=None, alias="enabled")
+    acceptance_fee_percent: float | None = Field(default=None, alias="acceptanceFeePercent")
+    cancellation_penalty_percent: float | None = Field(default=None, alias="cancellationPenaltyPercent")
+    reputation: MercenaryReputationConfig | None = Field(default=None, alias="reputation")
+    bounty_min_active_citizens: int | None = Field(default=None, alias="bountyMinActiveCitizens")
+    national_bounty_min_active_citizens: int | None = Field(default=None, alias="nationalBountyMinActiveCitizens")
+    national_bounty_enabled: bool | None = Field(default=None, alias="nationalBountyEnabled")
+    bounty_cooldown_minutes: float | None = Field(default=None, alias="bountyCooldownMinutes")
+    max_bounty_wage_multiplier: float | None = Field(default=None, alias="maxBountyWageMultiplier")
+    auction: MercenaryAuctionConfig | None = Field(default=None, alias="auction")
+
+class GameConfigSubSkinReward(WareraModel):
+    skin_key: str | None = Field(default=None, alias="skinKey")
+    deadline: str | None = Field(default=None, alias="deadline")
+
 class GameConfig(WareraModel):
+    alliance: GameConfigAlliance | None = Field(default=None, alias="alliance")
     badge: GameConfigBadges | None = Field(default=None, alias="badge")
     battle: GameConfigBattle | None = Field(default=None, alias="battle")
     citizenship_application: GameConfigCitizenshipApplication | None = Field(default=None, alias="citizenshipApplication")
@@ -835,6 +941,8 @@ class GameConfig(WareraModel):
     government: GameConfigGovernment | None = Field(default=None, alias="government")
     items: GameConfigItems | None = Field(default=None, alias="items")
     law: GameConfigLaw | None = Field(default=None, alias="law")
+    loot: GameConfigLoot | None = Field(default=None, alias="loot")
+    mercenary_contract: GameConfigMercenaryContract | None = Field(default=None, alias="mercenaryContract")
     merging_cost: MergingCostByRarity | None = Field(default=None, alias="mergingCost")
     mission: GameConfigMission | None = Field(default=None, alias="mission")
     mu: GameConfigMu | None = Field(default=None, alias="mu")
@@ -844,6 +952,7 @@ class GameConfig(WareraModel):
     referral: GameConfigReferral | None = Field(default=None, alias="referral")
     region: GameConfigRegion | None = Field(default=None, alias="region")
     skills: GameConfigSkills | None = Field(default=None, alias="skills")
+    sub_skin_reward: GameConfigSubSkinReward | None = Field(default=None, alias="subSkinReward")
     unrest: GameConfigUnrest | None = Field(default=None, alias="unrest")
     upgrade: GameConfigUpgrade | None = Field(default=None, alias="upgrade")
     upgrades_config: GameConfigUpgradesConfig | None = Field(default=None, alias="upgradesConfig")

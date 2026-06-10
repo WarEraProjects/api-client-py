@@ -30,6 +30,7 @@ from ._enums import (
     BattleRankingEntityType,
     BattleRankingSide,
     EventType,
+    MercenaryAuctionStatus,
     RankingType,
     TransactionType,
     UpgradeType,
@@ -174,6 +175,20 @@ def get_client() -> WareraClient:
     return _default_client
 
 
+async def validate_api_key() -> bool:
+    """
+    Check whether the configured API key is accepted by the server.
+
+    Returns ``True`` if the key is valid, ``False`` if no key is configured
+    or the server rejected it. Typical flow::
+
+        warera.set_api_key("...")
+        if not await warera.validate_api_key():
+            raise SystemExit("invalid WarEra API key")
+    """
+    return await get_client().validate_api_key()
+
+
 _RESOURCE_NAMES = {
     "action_log",
     "article",
@@ -222,6 +237,7 @@ __all__ = [
     "WareraClient",
     "set_api_key",
     "get_client",
+    "validate_api_key",
     # Exceptions
     "WareraError",
     "WareraHTTPError",
@@ -242,6 +258,7 @@ __all__ = [
     "BattleRankingEntityType",
     "BattleRankingSide",
     "EventType",
+    "MercenaryAuctionStatus",
     "RankingType",
     "TransactionType",
     "UpgradeType",
