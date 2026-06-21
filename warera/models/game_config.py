@@ -206,7 +206,7 @@ class ItemDepositResource(WareraModel):
 
 class ItemFlatStatsCocain(WareraModel):
     buff_duration_hours: int | None = Field(default=None, alias="buffDurationHours")
-    debuff_duration_hours: int | None = Field(default=None, alias="debuffDurationHours")
+    debuff_duration_hours: float | None = Field(default=None, alias="debuffDurationHours")
     percent_attack: float | None = Field(default=None, alias="percentAttack")
 
 class ItemProductionNeedsCoca(WareraModel):
