@@ -50,6 +50,10 @@ from .exceptions import (
 )
 from .models import (
     ActionLog,
+    Alliance,
+    AllianceMemberCountry,
+    AllianceRankingEntry,
+    AllianceRankings,
     Article,
     ArticleLite,
     Battle,
@@ -92,6 +96,7 @@ from .models import (
 
 if typing.TYPE_CHECKING:
     from .resources.action_log import ActionLogResource
+    from .resources.alliance import AllianceResource
     from .resources.article import ArticleResource
     from .resources.battle import BattleResource
     from .resources.battle_loot_summary import BattleLootSummaryResource
@@ -124,6 +129,7 @@ if typing.TYPE_CHECKING:
     from .resources.worker import WorkerResource
 
     action_log: ActionLogResource
+    alliance: AllianceResource
     article: ArticleResource
     battle: BattleResource
     battle_loot_summary: BattleLootSummaryResource
@@ -192,6 +198,7 @@ async def validate_api_key() -> bool:
 
 _RESOURCE_NAMES = {
     "action_log",
+    "alliance",
     "article",
     "battle",
     "battle_loot_summary",
@@ -266,6 +273,10 @@ __all__ = [
     "UpgradeType",
     # Models
     "ActionLog",
+    "Alliance",
+    "AllianceMemberCountry",
+    "AllianceRankingEntry",
+    "AllianceRankings",
     "Article",
     "ArticleLite",
     "Battle",

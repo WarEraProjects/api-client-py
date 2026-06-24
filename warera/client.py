@@ -29,6 +29,7 @@ from typing import Any
 from ._batch import MAX_BATCH_SIZE, BatchSession
 from ._http import DEFAULT_BASE_URL, HttpSession, OnRetryCallback
 from .resources.action_log import ActionLogResource
+from .resources.alliance import AllianceResource
 from .resources.article import ArticleResource
 from .resources.battle import BattleResource
 from .resources.battle_loot_summary import BattleLootSummaryResource
@@ -102,6 +103,7 @@ class WareraClient:
         client.battle_loot_summary → BattleLootSummaryResource
         client.mercenary_contract_auction → MercenaryContractAuctionResource
         client.tournament    → TournamentResource
+        client.alliance      → AllianceResource
     """
 
     def __init__(
@@ -168,6 +170,7 @@ class WareraClient:
         self._concurrency = concurrency
 
         # --- Resource namespaces ---
+        self.alliance = AllianceResource(self._http)
         self.user = UserResource(self._http)
         self.company = CompanyResource(self._http)
         self.country = CountryResource(self._http)

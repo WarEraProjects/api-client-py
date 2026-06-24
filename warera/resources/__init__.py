@@ -1,4 +1,5 @@
 from .action_log import ActionLogResource
+from .alliance import AllianceResource
 from .article import ArticleResource
 from .battle import BattleResource
 from .battle_loot_summary import BattleLootSummaryResource
@@ -32,6 +33,7 @@ from .worker import WorkerResource
 
 __all__ = [
     "ActionLogResource",
+    "AllianceResource",
     "ArticleResource",
     "BattleResource",
     "BattleLootSummaryResource",

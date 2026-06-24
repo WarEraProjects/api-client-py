@@ -133,6 +133,7 @@ class WareraClient:
         _run(self._async_client._http.__aenter__())
 
         # Wrap every resource namespace
+        self.alliance = _wrap_resource(self._async_client.alliance)
         self.user = _wrap_resource(self._async_client.user)
         self.company = _wrap_resource(self._async_client.company)
         self.country = _wrap_resource(self._async_client.country)
@@ -235,6 +236,7 @@ def get_client() -> WareraClient:
 
 _RESOURCE_NAMES = {
     "action_log",
+    "alliance",
     "article",
     "battle",
     "battle_loot_summary",

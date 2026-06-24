@@ -1,4 +1,5 @@
 from .action_log import ActionLog
+from .alliance import Alliance, AllianceMemberCountry, AllianceRankingEntry, AllianceRankings
 from .article import Article, ArticleLite
 from .battle import Battle, BattleLive
 from .battle_loot_summary import BattleLootPoolItem, BattleLootSummary
@@ -63,6 +64,10 @@ from .worker import Worker, WorkerCount
 
 __all__ = [
     "ActionLog",
+    "Alliance",
+    "AllianceMemberCountry",
+    "AllianceRankingEntry",
+    "AllianceRankings",
     "Article",
     "ArticleLite",
     "Battle",

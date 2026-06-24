@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from warera.resources.alliance import AllianceResource
 from warera.resources.company import CompanyResource
 from warera.resources.donation import DonationResource
 from warera.resources.election import ElectionResource
@@ -481,3 +482,97 @@ async def test_item_trading_get_public_orders_empty():
     assert summary.buy_orders == []
     assert summary.sell_orders == []
     assert summary.total_buy_money_invested == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Alliance
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_alliance_get_parses_model():
+    raw = {
+        "_id": "a1",
+        "name": "Global Alliance",
+        "scheme": "blue",
+        "mapAccent": "red",
+        "leader": "u1",
+        "memberCountries": [
+            {
+                "country": "7",
+                "coreDevelopment": 50.0,
+                "averageDevelopment": 45.0,
+                "suspended": False,
+            }
+        ],
+        "currentDevelopment": 100.5,
+        "coreDevelopment": 90.0,
+        "averageDevelopment": 95.0,
+        "rankings": {
+            "alliancePopulation": {
+                "value": 500,
+                "rank": 1,
+                "tier": "S",
+            }
+        },
+        "avatarUrl": "http://example.com/avatar.png",
+    }
+    resource = AllianceResource(_mock_http(raw))
+    alliance = await resource.get("a1")
+
+    assert alliance.id == "a1"
+    assert alliance.name == "Global Alliance"
+    assert alliance.scheme == "blue"
+    assert alliance.map_accent == "red"
+    assert alliance.leader_id == "u1"
+    assert alliance.current_development == 100.5
+    assert alliance.core_development == 90.0
+    assert alliance.average_development == 95.0
+    assert alliance.avatar_url == "http://example.com/avatar.png"
+    assert alliance.member_countries is not None
+    assert len(alliance.member_countries) == 1
+    assert alliance.member_countries[0].country_id == "7"
+    assert alliance.member_countries[0].core_development == 50.0
+    assert alliance.member_countries[0].average_development == 45.0
+    assert alliance.member_countries[0].suspended is False
+    assert alliance.rankings is not None
+    assert alliance.rankings.alliance_population is not None
+    assert alliance.rankings.alliance_population.value == 500
+    assert alliance.rankings.alliance_population.rank == 1
+    assert alliance.rankings.alliance_population.tier == "S"
+
+
+@pytest.mark.asyncio
+async def test_alliance_get_many_returns_list():
+    raw = [
+        {"_id": "a1", "name": "Alliance One"},
+        {"_id": "a2", "name": "Alliance Two"},
+    ]
+    resource = AllianceResource(_mock_http(raw))
+    alliances = await resource.get_many(["a1", "a2"])
+
+    assert len(alliances) == 2
+    assert alliances[0].id == "a1"
+    assert alliances[0].name == "Alliance One"
+    assert alliances[1].id == "a2"
+    assert alliances[1].name == "Alliance Two"
+
+
+@pytest.mark.asyncio
+async def test_alliance_get_paginated_returns_cursor_page():
+    raw = {
+        "items": [
+            {"_id": "a1", "name": "Alliance One"},
+            {"_id": "a2", "name": "Alliance Two"},
+        ],
+        "nextCursor": "cursor123",
+        "hasMore": True,
+    }
+    resource = AllianceResource(_mock_http(raw))
+    page = await resource.get_paginated(limit=2)
+
+    assert len(page.items) == 2
+    assert page.items[0].name == "Alliance One"
+    assert page.next_cursor == "cursor123"
+    assert page.has_more is True
+
