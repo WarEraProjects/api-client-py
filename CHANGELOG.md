@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.2.1] — 2026-06-24
+
+### 🗺️ New Resource: Alliance
+
+- **`client.alliance`** is now a fully wired resource namespace (was missing in 0.2.0).
+- **`alliance.get(alliance_id)`** — fetch a single alliance by ID.
+- **`alliance.get_many(ids)`** — batch-fetch multiple alliances by ID list.
+- **`alliance.get_paginated(...)`** — cursor-paginated alliance listing with full `auto_items=True` and `cursor_end`/`max_pages` support.
+- **`alliance.collect_all()`** — deprecated convenience wrapper that falls through to `parallel_collect_all`; emits `DeprecationWarning`.
+- New `Alliance`, `AllianceRankings`, `AllianceRankingEntry`, `AllianceMemberCountry` models, all fully typed.
+
+### 📦 Expanded Model Exports (models `__init__.py`)
+
+Many models introduced in 0.2.0 were not re-exported from the package root. `warera/models/__init__.py` now exports all of them explicitly:
+
+- `BattleLootSummary`, `BattleLootPoolItem`
+- `MercenaryContractAuction`, `MercenaryContractAuctionBid`
+- `Equipment`, `EquipmentSkills`
+- `Tournament`, `TournamentMatch`, `TournamentRound`, `TournamentTeam`, `TournamentRegistered`
+- `SearchResult` (companion to the already-exported `SearchResults`)
+- `CountryRankings`, `CountryTaxes`, `CountryUnrest`, `CountryStrategicResources`, `CountryStrategicResourceMap`, `CountryStrategicBonuses`
+- `Government`, `GovernmentDates`, `GovernmentMember`
+- `MilitaryUnit`, `MuRoles`, `MuRankings`, `MuLeveling`, `MuActiveUpgradeLevels`
+- `User` sub-models: `UserDates`, `UserLeveling`, `UserPreferences`, `UserRankings`, `UserSkills`, `UserStats`, `RankingDetail`, `SkillDetail`
+- `ReprMixin`, `WareraModel` (for downstream subclassing)
+- `AllianceMemberCountry`, `AllianceRankingEntry`, `AllianceRankings`
+
+### 🔄 `collect_all()` Deprecation Across All Paginated Resources
+
+All resources that previously offered `collect_all()` now emit a `DeprecationWarning` when called and delegate internally to `get_paginated(auto_items=True)` or `parallel_collect_all`. Affected resources: `Alliance`, `Article`, `Battle`, `Event`, `Party`, and any other resource that had the method. This matches the 0.2.0 changelog note that `collect_all()` was rewritten using the parallel time-slicing engine — the deprecation path is now formalized.
+
+### 🔬 New `async_memoize` Decorator (`_cache.py`)
+
+Added `warera._cache.async_memoize`, an unbounded async memoization decorator with thundering-herd protection (concurrent calls for the same key share the same `Future`). Used internally; not yet part of the public API surface.
+
+### 🌍 `WARERA_MAX_CONCURRENCY` Environment Override
+
+The parallel time-slicing engine in `_pagination.py` now reads `WARERA_MAX_CONCURRENCY` from the environment (default: `500`) so operators can tune peak concurrency without changing code:
+
+```bash
+export WARERA_MAX_CONCURRENCY=50   # gentler on rate limits
+```
+
+### 🐍 Jupyter / `nest_asyncio` Support in Sync Client
+
+The sync shim (`warera.sync`) now detects when it is called from inside a running event loop (e.g. Jupyter or IPython) and applies `nest_asyncio` if installed, rather than raising a `RuntimeError`. `nest_asyncio` is optional — the shim degrades gracefully to `asyncio.run()` when the library is absent.
+
+### 🧪 Test Suite Expansion
+
+- `test_swr.py` — new dedicated tests for `SWRCache`: basic fetch, stale-while-revalidate background refresh, and concurrent thundering-herd deduplication.
+- `test_user_parsing.py` — regression tests for `User.equipped_skin_keys` (dict, not list) and `User.finished_tours` (dict, not list), locking in the 0.2.0 schema fix.
+- `test_enhancements.py` — model `__str__` / `__repr__` tests, `ReprMixin` coverage, `CursorPage` iteration and `len()`, `BaseResource.__str__`, `WareraClient.__str__`, and `BatchItem` lifecycle display.
+- `test_custom_resources.py` — unit tests for newer resource namespaces: `Alliance`, `Party`, `Election`, `Donation`, `GameStat`, `MuMember`, `Work`, `WorkOffer`, `ItemTrading`, `Company`.
+
+---
+
 ## [0.2.0] — 2026-05-27
 
 ### ✅ Live-Verified Response Schemas
@@ -19,7 +75,7 @@ Every public endpoint was validated field-by-field against live production paylo
 
 ### 🔐 Graceful Auth Handling
 
-- **Context-aware 401 errors**: `WareraUnauthorizedError` now tells you *why* — "no API key is configured (set `WARERA_API_KEY` / `warera.set_api_key()`)" vs "the configured API key was rejected". Inspect `err.api_key_configured` programmatically.
+- **Context-aware 401 errors**: `WareraUnauthorizedError` now tells you *why* — "no API key is configured (set `WARERA_API_KEY` / `warera.set_api_key()`)\" vs "the configured API key was rejected". Inspect `err.api_key_configured` programmatically.
 - **`validate_api_key()`**: new on both clients and module-level (`await warera.validate_api_key()`, sync `warera.sync.validate_api_key()`). Returns `True`/`False` without raising; network/server errors still propagate so an outage isn't mistaken for a bad key.
 - **`set_api_key(key, validate=True)`** (sync module) validates the key against the server immediately and raises if rejected.
 - New `WareraClient.has_api_key` property.
