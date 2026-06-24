@@ -238,7 +238,7 @@ def __getattr__(name: str) -> typing.Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     # Client
