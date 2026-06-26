@@ -12,18 +12,30 @@ import warera
 WIKI_DIR = os.path.join(os.path.dirname(__file__), "api-client-py.wiki")
 REPO_URL = "https://github.com/WarEra-India/api-client-py.wiki.git"
 
-def get_pydantic_models_from_type(t: Any) -> set[type[BaseModel]]:
+def get_pydantic_models_from_type(t: Any, seen: set | None = None) -> set[type[BaseModel]]:
+    if seen is None:
+        seen = set()
     models = set()
+    
+    # Handle string forward refs implicitly by just ignoring or trying to resolve if we had a namespace
+    if type(t) is typing.ForwardRef:
+        return models
+        
     origin = get_origin(t)
     args = get_args(t)
     
-    if type(t) is type and issubclass(t, BaseModel):
+    if isinstance(t, type) and issubclass(t, BaseModel):
+        if t in seen:
+            return models
+        seen.add(t)
         models.add(t)
+        # Recurse into fields
+        for field_name, field_info in t.model_fields.items():
+            if field_info.annotation is not None:
+                models.update(get_pydantic_models_from_type(field_info.annotation, seen))
     elif origin:
         for arg in args:
-            models.update(get_pydantic_models_from_type(arg))
-    elif type(t) is typing.ForwardRef:
-        pass
+            models.update(get_pydantic_models_from_type(arg, seen))
     
     return models
 
@@ -100,12 +112,18 @@ def generate_method_markdown(method_name: str, method: Any) -> str:
             lines.append(f"| `{name}` | `{ptype}` | `{pdef}` |")
         lines.append("")
         
-    ret_type = sig.return_annotation
+    try:
+        type_hints = typing.get_type_hints(method)
+        ret_type = type_hints.get('return', inspect.Signature.empty)
+    except Exception:
+        ret_type = sig.return_annotation
+
     if ret_type != inspect.Signature.empty:
         models = get_pydantic_models_from_type(ret_type)
         if models:
             lines.append("### Return Models")
-            for model in models:
+            # Sort models by name for consistent output
+            for model in sorted(models, key=lambda m: m.__name__):
                 lines.append(generate_schema_markdown(model))
                 lines.append("")
                 
@@ -133,11 +151,12 @@ def generate_resource_page(name: str, res: Any) -> str:
     return "\n".join(lines)
 
 def run():
-    print(f"Cloning {REPO_URL} into {WIKI_DIR}...")
     if os.path.exists(WIKI_DIR):
-        shutil.rmtree(WIKI_DIR)
-        
-    subprocess.run(["git", "clone", REPO_URL, WIKI_DIR], check=True)
+        print("Pulling latest changes...")
+        subprocess.run(["git", "-C", WIKI_DIR, "pull"], check=True)
+    else:
+        print(f"Cloning {REPO_URL} into {WIKI_DIR}...")
+        subprocess.run(["git", "clone", REPO_URL, WIKI_DIR], check=True)
     
     client = warera.WareraClient()
     resources = []
