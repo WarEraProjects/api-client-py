@@ -223,25 +223,10 @@ class WareraClient:
     def __init__(self, api_key: str | None = None, **kwargs: Any) -> None:
         self._async_client = _AsyncClient(api_key=api_key, **kwargs)
         _run(self._async_client._http.__aenter__())
-        self._closed = False
-
-    def close(self) -> None:
-        """Close the underlying HTTP session."""
-        if not getattr(self, "_closed", True):
-            _run(self._async_client._http.__aexit__(None, None, None))
-            self._closed = True
-
-    def __enter__(self) -> "WareraClient":
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        self.close()
-
     def __del__(self) -> None:
-        try:
+        import contextlib
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
         # Wrap every resource namespace
         self.alliance = _wrap_resource(self._async_client.alliance)
