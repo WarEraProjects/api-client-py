@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.2] - 2026-06-26
+## [0.2.2] — 2026-06-26
 
 This release patches several critical memory, concurrency, and parsing issues reported in the 3.1 Pro extended audit.
 
@@ -18,7 +18,6 @@ This release patches several critical memory, concurrency, and parsing issues re
 - **Async Generator Leaks (`sync.py`):** Added `threading.Event()` and bounded backpressure to the internal thread-safe `Queue` in `_run_async_gen`. If a synchronous caller breaks early out of a paginated loop, the background asyncio thread is immediately cancelled, preventing a severe memory blowout where the thread would silently fetch and stash millions of ghost-records.
 - **Hanging Futures in Batching (`_http.py`):** Fixed an edge-case in `_auto_batch_flush` where an inexplicably omitted response index from a batch payload (API anomaly) would cause the corresponding waiting `Future` to never resolve, deadlocking the calling coroutine.
 - **Region `active_battle` Typing:** Replaced the loosely typed `dict[str, Any]` on the `Region.active_battle` field with the strict `Battle` Pydantic model for complete IDE autocomplete coverage.
-
 - **Client Cancellation Deadlocks (`_http.py`):** The auto-batch flusher now catches `BaseException` to correctly handle `asyncio.CancelledError`, ensuring pending futures are cleanly excepted and preventing deadlocks during `client.aclose()`.
 - **Orphaned Tasks & Daemon Thread Leaks (`sync.py`):** The synchronous generator consumer now explicitly cancels the background asyncio task when broken early. Furthermore, `atexit` is now used to register a graceful `shutdown()` hook that completely terminates the background loop and daemon thread upon process exit, stopping `ssl.SSLSocket` resource leaks.
 - **SWR Cache Race Conditions (`_swr.py`):** Duplicate background tasks on simultaneous stale cache misses are now prevented by synchronously assigning the pending task to the `_inflight` dictionary immediately after `loop.create_task()`.
