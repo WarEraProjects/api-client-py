@@ -753,8 +753,9 @@ class TestSyncProxy(unittest.TestCase):
         result = proxy.get("42")
         self.assertEqual(result, {"id": "42"})
 
-    def test_sync_proxy_wraps_async_generator_to_list(self):
+    def test_sync_proxy_wraps_async_generator_to_generator(self):
         from warera.sync import _SyncResourceProxy  # noqa: PLC0415
+        from collections.abc import Iterator
 
         class FakeResource:
             async def paginate(self):
@@ -763,8 +764,8 @@ class TestSyncProxy(unittest.TestCase):
 
         proxy = _SyncResourceProxy(FakeResource())
         result = proxy.paginate()
-        self.assertIsInstance(result, list)
-        self.assertEqual(result, [0, 1, 2])
+        self.assertIsInstance(result, Iterator)
+        self.assertEqual(list(result), [0, 1, 2])
 
     def test_sync_proxy_passes_through_non_async_attr(self):
         from warera.sync import _SyncResourceProxy  # noqa: PLC0415

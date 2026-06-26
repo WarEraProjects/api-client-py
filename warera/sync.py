@@ -17,8 +17,8 @@ Usage:
         gov = batch.add("government.getByCountryId", {"countryId": "7"})
     print(c1.result)
 
-Note: Each method call opens and closes its own asyncio event loop via
-asyncio.run(). For high-throughput workloads, prefer the async client.
+Note: This module spawns a daemon thread with an isolated asyncio event loop
+to safely run coroutines without interfering with the main thread's loop.
 """
 
 from __future__ import annotations
@@ -26,47 +26,82 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
+import queue
+import threading
+from collections.abc import Iterator
 from typing import Any, cast
 
 from ._batch import BatchSession
 from .client import WareraClient as _AsyncClient
 
-try:
-    import nest_asyncio as _nest_asyncio
+# ---------------------------------------------------------------------------
+# Background Event Loop Engine
+# ---------------------------------------------------------------------------
 
-    _HAS_NEST_ASYNCIO = True
-except ImportError:  # nest_asyncio is optional (only needed inside Jupyter)
-    _nest_asyncio = None
-    _HAS_NEST_ASYNCIO = False
+_bg_loop: asyncio.AbstractEventLoop | None = None
+_bg_thread: threading.Thread | None = None
+_loop_lock = threading.Lock()
+
+
+def _start_bg_loop(loop: asyncio.AbstractEventLoop) -> None:
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+
+def _ensure_loop() -> asyncio.AbstractEventLoop:
+    global _bg_loop, _bg_thread
+    with _loop_lock:
+        if _bg_loop is None:
+            _bg_loop = asyncio.new_event_loop()
+            _bg_thread = threading.Thread(
+                target=_start_bg_loop, args=(_bg_loop,), daemon=True, name="WareraSyncThread"
+            )
+            _bg_thread.start()
+        return _bg_loop
 
 
 def _run(coro: Any) -> Any:
-    """
-    Run a coroutine synchronously.
-
-    Uses asyncio.get_running_loop() to safely detect whether we are already
-    inside a running event loop (e.g. Jupyter). The older get_event_loop()
-    is deprecated in Python 3.10 and raises a RuntimeError in 3.12 when
-    called with no current loop, making get_running_loop() the correct choice.
-    """
-    try:
-        loop = asyncio.get_running_loop()
-        # Already inside a running event loop (e.g. Jupyter) — use nest_asyncio.
-        if _HAS_NEST_ASYNCIO and _nest_asyncio is not None:
-            _nest_asyncio.apply()
-        return loop.run_until_complete(coro)
-    except RuntimeError:
-        # No running loop — safe to call asyncio.run().
-        return asyncio.run(coro)
+    """Run a coroutine synchronously on the background event loop."""
+    loop = _ensure_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result()
 
 
-def _sync_generator(async_gen_fn: Any, *args: Any, **kwargs: Any) -> list[Any]:
-    """Drain an async generator into a list synchronously."""
+def _run_async_gen(async_gen: Any) -> Iterator[Any]:
+    """Drain an async generator into a thread-safe Queue and yield synchronously."""
+    loop = _ensure_loop()
+    q: queue.Queue[Any] = queue.Queue()
+    _sentinel = object()
 
-    async def _collect() -> list[Any]:
-        return [item async for item in async_gen_fn(*args, **kwargs)]
+    async def _producer() -> None:
+        try:
+            async for item in async_gen:
+                q.put((True, item))
+        except Exception as e:
+            q.put((False, e))
+        finally:
+            q.put(_sentinel)
 
-    return cast("list[Any]", _run(_collect()))
+    asyncio.run_coroutine_threadsafe(_producer(), loop)
+
+    while True:
+        msg = q.get()
+        if msg is _sentinel:
+            break
+        ok, val = msg
+        if not ok:
+            raise val
+        yield val
+
+
+def _sync_generator(async_gen_fn: Any, *args: Any, **kwargs: Any) -> Iterator[Any]:
+    """Helper to call an async generator function and consume it synchronously."""
+    return _run_async_gen(async_gen_fn(*args, **kwargs))
+
+
+# ---------------------------------------------------------------------------
+# Synchronous Wrappers
+# ---------------------------------------------------------------------------
 
 
 def _wrap_resource(async_resource: Any) -> _SyncResourceProxy:
@@ -76,7 +111,7 @@ def _wrap_resource(async_resource: Any) -> _SyncResourceProxy:
 class _SyncResourceProxy:
     """
     Wraps an async resource class, making every coroutine method callable
-    synchronously and every async generator method return a list.
+    synchronously and every async generator method return a true generator.
     """
 
     def __init__(self, resource: Any) -> None:
@@ -90,10 +125,9 @@ class _SyncResourceProxy:
             @functools.wraps(attr)
             def sync_method(*args: Any, **kwargs: Any) -> Any:
                 result = _run(attr(*args, **kwargs))
+                # In rare cases where a coroutine returns an async generator
                 if inspect.isasyncgen(result):
-                    async def _drain(gen: Any) -> list[Any]:
-                        return [item async for item in gen]
-                    return _run(_drain(result))
+                    return _run_async_gen(result)
                 return result
 
             return sync_method
@@ -101,10 +135,28 @@ class _SyncResourceProxy:
         if inspect.isasyncgenfunction(attr):
 
             @functools.wraps(attr)
-            def sync_gen(*args: Any, **kwargs: Any) -> list[Any]:
-                return _sync_generator(attr, *args, **kwargs)
+            def sync_gen(*args: Any, **kwargs: Any) -> Any:
+                yield from _sync_generator(attr, *args, **kwargs)
 
             return sync_gen
+
+        # Check if the attr itself is a callable that returns an asyncgen, 
+        # but isn't strictly an asyncgen function (e.g. decorators)
+        if callable(attr):
+            @functools.wraps(attr)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                res = attr(*args, **kwargs)
+                if inspect.isasyncgen(res):
+                    yield from _run_async_gen(res)
+                elif inspect.iscoroutine(res):
+                    ret = _run(res)
+                    if inspect.isasyncgen(ret):
+                        yield from _run_async_gen(ret)
+                    else:
+                        return ret
+                else:
+                    return res
+            return wrapper
 
         return attr
 

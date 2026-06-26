@@ -32,7 +32,7 @@ def _parse_cursor_date(cursor: str) -> datetime | None:
     # Handle JS Date format: "Wed May 27 2026 05:41:00 GMT+0000 (Coordinated Universal Time)"
     if "GMT" in date_str:
         try:
-            clean_str = date_str[:24]
+            clean_str = date_str.split(" GMT")[0]
             dt = datetime.strptime(clean_str, "%a %b %d %Y %H:%M:%S")
             return dt.replace(tzinfo=timezone.utc)
         except ValueError:
