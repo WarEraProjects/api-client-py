@@ -211,12 +211,21 @@ def run():
             
     # Generate Resource Pages
     sidebar_lines = ["# Warera API Client", ""]
-    sidebar_lines.append("## Core")
+    sidebar_lines.append("## Getting Started")
     sidebar_lines.append("- [Home](Home)")
+    sidebar_lines.append("- [Introduction](Introduction)")
+    sidebar_lines.append("- [Your First Script](Getting-Started)")
+    sidebar_lines.append("")
+    sidebar_lines.append("## Guides")
     sidebar_lines.append("- [Advanced Usage](Advanced-Usage)")
+    sidebar_lines.append("- [Code Snippets](Code-Snippets)")
+    sidebar_lines.append("- [FAQ](FAQ)")
+    sidebar_lines.append("")
+    sidebar_lines.append("## Reference")
+    sidebar_lines.append("- [API Reference](API-Reference)")
     sidebar_lines.append("- [Migration Guide](Migration-Guide)")
     sidebar_lines.append("")
-    sidebar_lines.append("## API Reference")
+    sidebar_lines.append("## Resources")
     
     api_ref_lines = ["# API Reference", "", "Below is a list of all available resource namespaces on the `WareraClient`:"]
     
@@ -240,7 +249,11 @@ def run():
     with open(os.path.join(WIKI_DIR, "API-Reference.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(api_ref_lines))
 
-    for doc_name in ["Home.md", "Advanced-Usage.md", "Migration-Guide.md"]:
+    for doc_name in [
+        "Home.md", "Introduction.md", "Getting-Started.md", 
+        "Advanced-Usage.md", "Code-Snippets.md", "FAQ.md", 
+        "Migration-Guide.md"
+    ]:
         main_doc = os.path.join(os.path.dirname(__file__), "..", "wiki", doc_name)
         if os.path.exists(main_doc):
             print(f"Copying {doc_name}...")
