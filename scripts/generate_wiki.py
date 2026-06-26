@@ -34,6 +34,13 @@ def get_pydantic_models_from_type(t: Any, seen: set | None = None) -> set[type[B
             if field_info.annotation is not None:
                 models.update(get_pydantic_models_from_type(field_info.annotation, seen))
     elif origin:
+        if isinstance(origin, type) and issubclass(origin, BaseModel):
+            if origin not in seen:
+                seen.add(origin)
+                models.add(origin)
+                for field_name, field_info in origin.model_fields.items():
+                    if field_info.annotation is not None:
+                        models.update(get_pydantic_models_from_type(field_info.annotation, seen))
         for arg in args:
             models.update(get_pydantic_models_from_type(arg, seen))
     
@@ -51,7 +58,7 @@ def clean_type_str(t: Any) -> str:
 def generate_schema_markdown(model: type[BaseModel]) -> str:
     schema = model.model_json_schema()
     lines = []
-    lines.append(f"### `{model.__name__}`")
+    lines.append(f"#### `{model.__name__}`")
     if "description" in schema:
         lines.append(schema["description"])
         lines.append("")
@@ -129,7 +136,8 @@ def generate_method_markdown(method_name: str, method: Any) -> str:
             if name == "self": continue
             ptype = clean_type_str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any"
             pdef = param.default if param.default != inspect.Parameter.empty else "*Required*"
-            lines.append(f"| `{name}` | `{ptype}` | `{pdef}` |")
+            pdef_str = f"`{pdef}`" if pdef != "*Required*" else pdef
+            lines.append(f"| `{name}` | `{ptype}` | {pdef_str} |")
         lines.append("")
         
     try:
@@ -142,6 +150,7 @@ def generate_method_markdown(method_name: str, method: Any) -> str:
         models = get_pydantic_models_from_type(ret_type)
         if models:
             lines.append("### Return Models")
+            lines.append("")
             # Sort models by name for consistent output
             for model in sorted(models, key=lambda m: m.__name__):
                 lines.append(generate_schema_markdown(model))
