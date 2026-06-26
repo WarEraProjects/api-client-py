@@ -99,15 +99,17 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
                     types.append(t)
                 elif "$ref" in sub:
                     types.append(sub["$ref"].split("/")[-1])
-            type_str = " &#124; ".join(types)
+            type_str = " &#124; ".join(f"`{t}`" for t in types)
             if not type_str:
-                type_str = "any"
+                type_str = "`any`"
             
         req_mark = "Required" if field_name in required else "Optional"
         
-        type_str = type_str.replace("|", "&#124;")
+        if not type_str.startswith("`"):
+            type_str = type_str.replace("|", "&#124;")
+            type_str = " &#124; ".join(f"`{t.strip()}`" for t in type_str.split("&#124;"))
         
-        lines.append(f"| `{field_name}` | `{type_str}` | {req_mark} |")
+        lines.append(f"| `{field_name}` | {type_str} | {req_mark} |")
         
     return "\n".join(lines)
 
@@ -137,7 +139,8 @@ def generate_method_markdown(method_name: str, method: Any) -> str:
             ptype = clean_type_str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any"
             pdef = param.default if param.default != inspect.Parameter.empty else "*Required*"
             pdef_str = f"`{pdef}`" if pdef != "*Required*" else pdef
-            lines.append(f"| `{name}` | `{ptype}` | {pdef_str} |")
+            ptype_formatted = " &#124; ".join(f"`{t.strip()}`" for t in ptype.split("&#124;"))
+            lines.append(f"| `{name}` | {ptype_formatted} | {pdef_str} |")
         lines.append("")
         
     try:
