@@ -162,10 +162,6 @@ async def parallel_collect_all(
                 async for page in result:
                     chunk_items.extend(page.items)
                     if not getattr(page, "has_more", True):
-                        abort_event.set()
-                        for t in chunk_tasks:
-                            if not t.done() and t != asyncio.current_task():
-                                t.cancel()
                         break
         except asyncio.CancelledError:
             pass

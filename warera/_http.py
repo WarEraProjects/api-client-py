@@ -467,10 +467,12 @@ class HttpSession:
                     fut.set_exception(exc.errors[i])
                 else:
                     fut.set_result(exc.results.get(i))
-        except Exception as e:
+        except BaseException as e:
             for fut in futs:
                 if not fut.done():
                     fut.set_exception(e)
+            if isinstance(e, asyncio.CancelledError):
+                raise
 
     async def _real_get(self, procedure: str, params: dict[str, Any]) -> Any:
         await self._ensure_client()
