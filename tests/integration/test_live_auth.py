@@ -113,4 +113,3 @@ async def test_work_stats_for_other_user_raises_clear_403(client):
     with pytest.raises(WareraForbiddenError) as exc_info:
         await client.work.get_stats_by_user(EXAMPLE_USER_ID, days=7, timezone="UTC")
     assert "own account" in str(exc_info.value)
-

@@ -33,9 +33,7 @@ class WareraUnauthorizedError(WareraHTTPError):
       • None  — unknown (error not raised by the HTTP layer).
     """
 
-    def __init__(
-        self, response_body: Any = None, api_key_configured: bool | None = None
-    ) -> None:
+    def __init__(self, response_body: Any = None, api_key_configured: bool | None = None) -> None:
         self.api_key_configured = api_key_configured
         if api_key_configured is False:
             message = (

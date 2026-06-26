@@ -96,7 +96,6 @@ class ElectionResource(BaseResource):
             items.append(item)
         return items
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[Election]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings

@@ -41,6 +41,8 @@ class SearchResource(BaseResource):
                 ids = raw.get(key, [])
                 if isinstance(ids, list):
                     for eid in ids:
-                        results.append(SearchResult.model_validate({"id": eid, "type": entity_type}))
+                        results.append(
+                            SearchResult.model_validate({"id": eid, "type": entity_type})
+                        )
 
         return SearchResults(results=results, total=len(results))

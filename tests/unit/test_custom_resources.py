@@ -575,4 +575,3 @@ async def test_alliance_get_paginated_returns_cursor_page():
     assert page.items[0].name == "Alliance One"
     assert page.next_cursor == "cursor123"
     assert page.has_more is True
-

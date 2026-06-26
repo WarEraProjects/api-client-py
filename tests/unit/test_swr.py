@@ -52,7 +52,7 @@ async def test_swr_cache_stale_revalidate():
 
     # Allow the background revalidation task to finish
     await asyncio.sleep(0.1)
-    
+
     assert fetches == 2
 
     # Next fetch should return the newly revalidated data
@@ -72,9 +72,7 @@ async def test_swr_cache_concurrent_fetches():
         return "data"
 
     # Fire 5 concurrent requests for the same key
-    results = await asyncio.gather(*(
-        cache.get("key", 10.0, fetcher) for _ in range(5)
-    ))
+    results = await asyncio.gather(*(cache.get("key", 10.0, fetcher) for _ in range(5)))
 
     # All should get the data, but fetcher should only be called ONCE
     for r in results:

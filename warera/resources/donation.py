@@ -122,7 +122,6 @@ class DonationResource(BaseResource):
         )
         return DonationTotals.model_validate(raw)
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[Donation]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings

@@ -108,7 +108,6 @@ class MUResource(BaseResource):
         results = await asyncio.gather(*futs, return_exceptions=True)
         return [r if not isinstance(r, BaseException) else None for r in results]
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[MilitaryUnit]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings

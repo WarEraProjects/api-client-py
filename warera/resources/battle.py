@@ -124,7 +124,6 @@ class BattleResource(BaseResource):
             items.append(item)
         return items
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[Battle]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings

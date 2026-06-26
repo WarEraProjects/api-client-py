@@ -82,7 +82,6 @@ class MercenaryContractAuctionResource(BaseResource):
         )
         return CursorPage.from_raw(raw, MercenaryContractAuction)
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[MercenaryContractAuction]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings

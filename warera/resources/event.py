@@ -84,7 +84,6 @@ class EventResource(BaseResource):
         )
         return CursorPage.from_raw(raw, Event)
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[Event]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings

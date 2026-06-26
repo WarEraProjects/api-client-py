@@ -388,16 +388,12 @@ async def test_http_session_retries_on_5xx():
 
     # Use a small delay for tests
     async with HttpSession(
-        base_url=BASE,
-        max_retries=3,
-        initial_delay_ms=1,
-        max_delay_ms=10
+        base_url=BASE, max_retries=3, initial_delay_ms=1, max_delay_ms=10
     ) as session:
         res = await session.get("test.endpoint", {})
 
     assert call_count == 3
     assert res == {"success": True}
-
 
 
 # ---------------------------------------------------------------------------

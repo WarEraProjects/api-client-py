@@ -109,9 +109,7 @@ WARERA_MAX_CONCURRENCY = int(os.environ.get("WARERA_MAX_CONCURRENCY", 500))
 
 
 async def parallel_collect_all(
-    fetch_fn: Callable[
-        ..., Coroutine[Any, Any, CursorPage[T]]
-    ],
+    fetch_fn: Callable[..., Coroutine[Any, Any, CursorPage[T]]],
     oldest_date: datetime | str | None = None,
     time_slice_days: float = 0.2,
     concurrency: int | None = None,
