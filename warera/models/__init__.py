@@ -20,7 +20,7 @@ from .donation import Donation, DonationTotals
 from .election import Election, ElectionCandidate
 from .event import Event
 from .game_config import GameConfig, GameDates
-from .government import Government, GovernmentDates, GovernmentMember
+from .government import Government, GovernmentDates
 from .inventory import Equipment, EquipmentSkills
 from .item_trading import ItemOffer, ItemPrice, TradingOrder
 from .mercenary_contract_auction import MercenaryContractAuction, MercenaryContractAuctionBid
@@ -96,7 +96,6 @@ __all__ = [
     "GameDates",
     "Government",
     "GovernmentDates",
-    "GovernmentMember",
     "Hit",
     "ItemOffer",
     "ItemPrice",

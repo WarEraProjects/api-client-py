@@ -24,3 +24,7 @@ class BaseResource:
         """Call a single GET procedure through the SWR cache."""
         cleaned = {k: v for k, v in params.items() if v is not None}
         return await self._http.get_swr(procedure, cleaned, ttl_seconds)
+
+    def invalidate_cache(self) -> None:
+        """Clear the SWR cache for all resources."""
+        self._http._swr_cache.clear()

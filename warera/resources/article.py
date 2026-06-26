@@ -82,7 +82,7 @@ class ArticleResource(BaseResource):
             categories:         Filter by category list.
             languages:          Filter by language codes (e.g. ["en", "ro"]).
             positive_score_only: When True, exclude downvoted articles.
-            auto_paginate:      If True, returns an AsyncIterator of CursorPages.
+            auto_items:         If True, returns an AsyncIterator of individual items.
             max_pages:          Maximum number of pages to fetch when auto-paginating.
             cursor_end:         Date string. Auto-pagination stops when cursor date is older than this.
         """
@@ -126,7 +126,7 @@ class ArticleResource(BaseResource):
         import warnings
 
         warnings.warn(
-            "`collect_all()` is deprecated. Use `get_all()` directly.",
+            "`collect_all()` is deprecated. Use `get_paginated(auto_items=True)` directly.",
             DeprecationWarning,
             stacklevel=2,
         )

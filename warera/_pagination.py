@@ -32,8 +32,6 @@ def _parse_cursor_date(cursor: str) -> datetime | None:
     # Handle JS Date format: "Wed May 27 2026 05:41:00 GMT+0000 (Coordinated Universal Time)"
     if "GMT" in date_str:
         try:
-            from datetime import timezone
-
             clean_str = date_str[:24]
             dt = datetime.strptime(clean_str, "%a %b %d %Y %H:%M:%S")
             return dt.replace(tzinfo=timezone.utc)
@@ -148,25 +146,36 @@ async def parallel_collect_all(
     sem = asyncio.Semaphore(concurrency)
     abort_event = asyncio.Event()
 
+    chunk_tasks: list[asyncio.Task[list[T]]] = []
+
     async def fetch_chunk(cur: str | None, cur_end: datetime) -> list[T]:
         if abort_event.is_set():
             return []
 
         chunk_items: list[T] = []
-        async with sem:
-            if abort_event.is_set():
-                return []
+        try:
+            async with sem:
+                if abort_event.is_set():
+                    return []
 
-            result = _auto_paginate_pages(
-                fetch_fn, cursor=cur, cursor_end=cur_end.isoformat(), **kwargs
-            )
-            async for page in result:
-                chunk_items.extend(page.items)
-                if not getattr(page, "has_more", True):
-                    abort_event.set()
+                result = _auto_paginate_pages(
+                    fetch_fn, cursor=cur, cursor_end=cur_end.isoformat(), **kwargs
+                )
+                async for page in result:
+                    chunk_items.extend(page.items)
+                    if not getattr(page, "has_more", True):
+                        abort_event.set()
+                        for t in chunk_tasks:
+                            if not t.done() and t != asyncio.current_task():
+                                t.cancel()
+                        break
+        except asyncio.CancelledError:
+            pass
         return chunk_items
 
-    chunk_results = await asyncio.gather(*[fetch_chunk(c, start) for c, start in chunks])
+    chunk_tasks = [asyncio.create_task(fetch_chunk(c, start)) for c, start in chunks]
+    raw_results = await asyncio.gather(*chunk_tasks, return_exceptions=True)
+    chunk_results = [r for r in raw_results if not isinstance(r, BaseException)]
 
     unique_items: list[T] = []
     seen = set()

@@ -24,7 +24,7 @@ async def main() -> None:
 
         # --- Government ---
         gov = await warera.government.get(india.id)
-        print(f"India Gov: {gov.dict() if gov else 'None'}")
+        print(f"India Gov: {gov.model_dump() if gov else 'None'}")
 
     # --- Concurrent User fetching ---
     # To fetch multiple things concurrently, just use asyncio.gather!
