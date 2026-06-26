@@ -7,7 +7,7 @@ This page contains answers to common questions and issues developers encounter w
 ### Do I need an API key to use the library?
 
 **No, but it is highly recommended.** 
-If you don't provide an API key, the library works perfectly fine anonymously. However, WarEra enforces much stricter rate limits on anonymous IP addresses (e.g., 200 requests instead of 1000). For anything beyond basic testing, [generate an API key in your game settings](https://warera.com/settings) and pass it to the client.
+If you don't provide an API key, the library works perfectly fine anonymously. However, WarEra enforces much stricter rate limits on anonymous IP addresses (e.g., 100 requests instead of 500). For anything beyond basic testing, [generate an API key in your game settings](https://warera.com/settings) and pass it to the client.
 
 ### What are these `_id` and `__v` fields on every model?
 
