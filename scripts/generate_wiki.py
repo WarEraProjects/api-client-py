@@ -44,7 +44,8 @@ def clean_type_str(t: Any) -> str:
     s = str(t)
     s = s.replace("typing.", "").replace("warera.resources.", "").replace("warera.models.", "").replace("warera._enums.", "")
     s = re.sub(r"<class '([^']+)'>", r"\1", s)
-    s = s.replace("|", "\\|")
+    s = s.replace(" | None", "").replace("None | ", "")
+    s = s.replace("|", "&#124;")
     return s
 
 def generate_schema_markdown(model: type[BaseModel]) -> str:
@@ -55,8 +56,8 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
         lines.append(schema["description"])
         lines.append("")
     
-    lines.append("| Field | Type | Required | Description |")
-    lines.append("|---|---|---|---|")
+    lines.append("| Field | Type | Required |")
+    lines.append("|---|---|---|")
     
     props = schema.get("properties", {})
     required = schema.get("required", [])
@@ -81,6 +82,8 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
             for sub in field_info["anyOf"]:
                 if "type" in sub:
                     t = sub["type"]
+                    if t == "null":
+                        continue
                     if t == "array" and "items" in sub:
                         item_type = sub["items"].get("type", "any")
                         if "$ref" in sub["items"]:
@@ -89,14 +92,15 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
                     types.append(t)
                 elif "$ref" in sub:
                     types.append(sub["$ref"].split("/")[-1])
-            type_str = " \\| ".join(types)
+            type_str = " &#124; ".join(types)
+            if not type_str:
+                type_str = "any"
             
-        req_mark = "✅" if field_name in required else "❌"
-        desc = field_info.get("description", "")
+        req_mark = "Required" if field_name in required else "Optional"
         
-        type_str = type_str.replace("|", "\\|")
+        type_str = type_str.replace("|", "&#124;")
         
-        lines.append(f"| `{field_name}` | `{type_str}` | {req_mark} | {desc} |")
+        lines.append(f"| `{field_name}` | `{type_str}` | {req_mark} |")
         
     return "\n".join(lines)
 
