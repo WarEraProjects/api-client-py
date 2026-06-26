@@ -55,6 +55,17 @@ def clean_type_str(t: Any) -> str:
     s = s.replace("|", "&#124;")
     return s
 
+def format_type_with_link(t: str) -> str:
+    def repl(m):
+        word = m.group(0)
+        if len(word) > 1 and word[0].isupper() and any(c.islower() for c in word[1:]):
+            if word not in ["Any", "None", "Optional"]:
+                return f'<a href="#{word.lower()}">{word}</a>'
+        return word
+    
+    formatted = re.sub(r'[a-zA-Z]+', repl, t)
+    return f"<code>{formatted}</code>"
+
 def generate_schema_markdown(model: type[BaseModel]) -> str:
     schema = model.model_json_schema()
     lines = []
@@ -99,17 +110,15 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
                     types.append(t)
                 elif "$ref" in sub:
                     types.append(sub["$ref"].split("/")[-1])
-            type_str = " &#124; ".join(f"`{t}`" for t in types)
+            type_str = " &#124; ".join(types)
             if not type_str:
-                type_str = "`any`"
+                type_str = "any"
             
         req_mark = "Required" if field_name in required else "Optional"
+        type_str = type_str.replace("|", "&#124;")
+        type_formatted = format_type_with_link(type_str)
         
-        if not type_str.startswith("`"):
-            type_str = type_str.replace("|", "&#124;")
-            type_str = " &#124; ".join(f"`{t.strip()}`" for t in type_str.split("&#124;"))
-        
-        lines.append(f"| `{field_name}` | {type_str} | {req_mark} |")
+        lines.append(f"| `{field_name}` | {type_formatted} | {req_mark} |")
         
     return "\n".join(lines)
 
@@ -139,7 +148,7 @@ def generate_method_markdown(method_name: str, method: Any) -> str:
             ptype = clean_type_str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any"
             pdef = param.default if param.default != inspect.Parameter.empty else "*Required*"
             pdef_str = f"`{pdef}`" if pdef != "*Required*" else pdef
-            ptype_formatted = " &#124; ".join(f"`{t.strip()}`" for t in ptype.split("&#124;"))
+            ptype_formatted = format_type_with_link(ptype)
             lines.append(f"| `{name}` | {ptype_formatted} | {pdef_str} |")
         lines.append("")
         
