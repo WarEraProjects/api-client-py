@@ -8,10 +8,8 @@ from .common import WareraModel
 class MuMember(WareraModel):
     """Membership and activity stats for a user within a military unit."""
 
-    mu: str | None = Field(
-        default=None, description="The UUID of the Military Unit this user belongs to."
-    )
-    user: str | None = Field(default=None, description="The user.")
+    mu: str | None = None
+    user: str | None = None
     total_damages_count: int | None = Field(
         default=None,
         validation_alias=AliasChoices("totalDamagesCount", "total_damages_count"),
@@ -36,9 +34,5 @@ class MuMember(WareraModel):
         default=None,
         validation_alias=AliasChoices("weeklyHelpCount", "weekly_help_count"),
     )
-    created_at: str | None = Field(
-        default=None, description="The timestamp when this record was created."
-    )
-    updated_at: str | None = Field(
-        default=None, description="The timestamp when this record was last modified."
-    )
+    created_at: str | None = None
+    updated_at: str | None = None
