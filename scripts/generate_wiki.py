@@ -56,8 +56,8 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
         lines.append(schema["description"])
         lines.append("")
     
-    lines.append("| Field | Type | Required |")
-    lines.append("|---|---|---|")
+    lines.append("| Field | Type | Required | Description |")
+    lines.append("|---|---|---|---|")
     
     props = schema.get("properties", {})
     required = schema.get("required", [])
@@ -97,10 +97,11 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
                 type_str = "any"
             
         req_mark = "Required" if field_name in required else "Optional"
+        desc = field_info.get("description", "")
         
         type_str = type_str.replace("|", "&#124;")
         
-        lines.append(f"| `{field_name}` | `{type_str}` | {req_mark} |")
+        lines.append(f"| `{field_name}` | `{type_str}` | {req_mark} | {desc} |")
         
     return "\n".join(lines)
 
