@@ -34,18 +34,12 @@ jobs:
           
       - name: Generate and Push Wiki
         run: |
-          # Generate the wiki files (the python script clones the wiki locally, and we can push directly to it if we use the implicit GITHUB_TOKEN)
-          # We need to pass the GITHUB_TOKEN so the script can push to the wiki repo.
-          # We'll just run the script which creates the files, then we push them.
-          # The script clones the wiki via HTTPS. We can change the origin to use the token.
+          # Clone the wiki repository securely using the GITHUB_TOKEN
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git scripts/api-client-py.wiki || echo "Wiki repository may not exist yet or clone failed"
           
-          # We will just run the script, which sets up the local clone.
           python scripts/generate_wiki.py
           
           cd scripts/api-client-py.wiki
-          
-          # Update the remote URL to include the token for authentication
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git
           
           git add .
           git diff --quiet && git diff --staged --quiet || (git commit -m "docs: Auto-generate wiki for branch ${{ github.event.inputs.branch }}" && git push)

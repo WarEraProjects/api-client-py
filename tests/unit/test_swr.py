@@ -78,3 +78,17 @@ async def test_swr_cache_concurrent_fetches():
     for r in results:
         assert r == "data"
     assert fetches == 1
+
+@pytest.mark.asyncio
+async def test_swr_cache_eviction():
+    cache = SWRCache()
+    
+    async def fetcher():
+        return "data"
+        
+    for i in range(1005):
+        await cache.get(f"key_{i}", 10.0, fetcher)
+        
+    assert len(cache._cache) == 1000
+    assert "key_0" not in cache._cache
+    assert "key_1004" in cache._cache

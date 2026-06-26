@@ -445,34 +445,38 @@ class HttpSession:
                 res = await self._real_get(proc, params)
                 if not fut.done():
                     fut.set_result(res)
-            except Exception as e:
+            except BaseException as e:
                 if not fut.done():
                     fut.set_exception(e)
+                if isinstance(e, asyncio.CancelledError):
+                    raise
             return
 
-        procedures = [q[0] for q in queue]
-        inputs = [q[1] for q in queue]
-        futs = [q[2] for q in queue]
-
-        try:
-            results = await self.post_batch(procedures, inputs)
-            for fut, res in zip(futs, results, strict=True):
-                if not fut.done():
-                    fut.set_result(res)
-        except WareraBatchError as exc:
-            for i, fut in enumerate(futs):
-                if fut.done():
-                    continue
-                if i in exc.errors:
-                    fut.set_exception(exc.errors[i])
-                else:
-                    fut.set_result(exc.results.get(i))
-        except BaseException as e:
-            for fut in futs:
-                if not fut.done():
-                    fut.set_exception(e)
-            if isinstance(e, asyncio.CancelledError):
-                raise
+        for start_idx in range(0, len(queue), 50):
+            chunk = queue[start_idx : start_idx + 50]
+            procedures = [q[0] for q in chunk]
+            inputs = [q[1] for q in chunk]
+            futs = [q[2] for q in chunk]
+    
+            try:
+                results = await self.post_batch(procedures, inputs)
+                for fut, res in zip(futs, results, strict=True):
+                    if not fut.done():
+                        fut.set_result(res)
+            except WareraBatchError as exc:
+                for i, fut in enumerate(futs):
+                    if fut.done():
+                        continue
+                    if i in exc.errors:
+                        fut.set_exception(exc.errors[i])
+                    else:
+                        fut.set_result(exc.results.get(i))
+            except BaseException as e:
+                for fut in futs:
+                    if not fut.done():
+                        fut.set_exception(e)
+                if isinstance(e, asyncio.CancelledError):
+                    raise
 
     async def _real_get(self, procedure: str, params: dict[str, Any]) -> Any:
         await self._ensure_client()

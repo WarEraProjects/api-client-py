@@ -122,7 +122,7 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
     return "\n".join(lines)
 
 
-def generate_method_markdown(method_name: str, method: Any) -> str:
+def generate_method_markdown(method_name: str, method: Any, resource_name: str) -> str:
     lines = []
     lines.append(f"## `.{method_name}()`")
     
@@ -134,7 +134,7 @@ def generate_method_markdown(method_name: str, method: Any) -> str:
     sig = inspect.signature(method)
     lines.append("### Signature")
     lines.append("```python")
-    lines.append(f"await client.{method.__self__.__class__.__name__.lower().replace('resource', '')}.{method_name}{sig}")
+    lines.append(f"await client.{resource_name}.{method_name}{sig}")
     lines.append("```")
     lines.append("")
     
@@ -188,18 +188,13 @@ def generate_resource_page(name: str, res: Any) -> str:
         if not callable(method):
             continue
         
-        lines.append(generate_method_markdown(method_name, method))
+        lines.append(generate_method_markdown(method_name, method, name))
         lines.append("---")
         
     return "\n".join(lines)
 
 def run() -> None:
-    if os.path.exists(WIKI_DIR):
-        print("Pulling latest changes...")
-        subprocess.run(["git", "-C", WIKI_DIR, "pull"], check=True)
-    else:
-        print(f"Cloning {REPO_URL} into {WIKI_DIR}...")
-        subprocess.run(["git", "clone", REPO_URL, WIKI_DIR], check=True)
+    os.makedirs(WIKI_DIR, exist_ok=True)
     
     client = warera.WareraClient()
     resources = []

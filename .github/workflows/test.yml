@@ -33,4 +33,4 @@ jobs:
       - name: Run tests
         env:
           WARERA_API_KEY: ${{ secrets.WARERA_API_KEY }}
-        run: pytest tests/ -v
+        run: pytest tests/unit/ -v

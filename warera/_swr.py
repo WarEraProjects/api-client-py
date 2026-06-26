@@ -85,5 +85,7 @@ class SWRCache:
 
     def clear(self) -> None:
         """Clear the cache entirely."""
+        for task in list(self._inflight.values()):
+            task.cancel()
         self._cache.clear()
         self._inflight.clear()
