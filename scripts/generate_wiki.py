@@ -67,12 +67,25 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
         if "$ref" in field_info:
             type_str = field_info["$ref"].split("/")[-1]
             
+        # Handle array items
+        if type_str == "array" and "items" in field_info:
+            item_type = field_info["items"].get("type", "any")
+            if "$ref" in field_info["items"]:
+                item_type = field_info["items"]["$ref"].split("/")[-1]
+            type_str = f"array[{item_type}]"
+            
         # Handle anyOf / allOf
         if "anyOf" in field_info:
             types = []
             for sub in field_info["anyOf"]:
                 if "type" in sub:
-                    types.append(sub["type"])
+                    t = sub["type"]
+                    if t == "array" and "items" in sub:
+                        item_type = sub["items"].get("type", "any")
+                        if "$ref" in sub["items"]:
+                            item_type = sub["items"]["$ref"].split("/")[-1]
+                        t = f"array[{item_type}]"
+                    types.append(t)
                 elif "$ref" in sub:
                     types.append(sub["$ref"].split("/")[-1])
             type_str = " | ".join(types)
