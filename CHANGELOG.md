@@ -15,6 +15,9 @@ This release patches several critical memory, concurrency, and parsing issues re
 - **Silent Batch Errors (`_batch.py`):** `fetch_many_by_ids` now correctly distinguishes between missing items (404 Not Found) and real system faults (500s, Rate Limits). Genuine faults are re-raised.
 - **URL Encoding:** Fixed implicit bytes-to-string encoding issues in `orjson.dumps()`.
 - **Restored `collect_all`:** Removed the deprecation warnings from `collect_all` across all resources. It is highly optimized via `parallel_collect_all` and is fully supported.
+- **Async Generator Leaks (`sync.py`):** Added `threading.Event()` and bounded backpressure to the internal thread-safe `Queue` in `_run_async_gen`. If a synchronous caller breaks early out of a paginated loop, the background asyncio thread is immediately cancelled, preventing a severe memory blowout where the thread would silently fetch and stash millions of ghost-records.
+- **Hanging Futures in Batching (`_http.py`):** Fixed an edge-case in `_auto_batch_flush` where an inexplicably omitted response index from a batch payload (API anomaly) would cause the corresponding waiting `Future` to never resolve, deadlocking the calling coroutine.
+- **Region `active_battle` Typing:** Replaced the loosely typed `dict[str, Any]` on the `Region.active_battle` field with the strict `Battle` Pydantic model for complete IDE autocomplete coverage.
 
 
 ## [0.2.1] — 2026-06-24
