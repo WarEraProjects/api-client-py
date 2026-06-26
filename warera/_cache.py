@@ -1,4 +1,5 @@
 import asyncio
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
@@ -14,7 +15,7 @@ def async_memoize(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
     Automatically handles concurrent 'thundering herd' requests by returning
     the same Future to all waiters.
     """
-    cache: dict[Any, asyncio.Future[R]] = {}
+    cache: OrderedDict[Any, asyncio.Future[R]] = OrderedDict()
 
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -27,13 +28,14 @@ def async_memoize(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             key = (str(args), str(kwargs))
 
         if key in cache:
+            cache.move_to_end(key)
             return await cache[key]
 
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
         cache[key] = fut
         if len(cache) > 1000:
-            cache.pop(next(iter(cache)))
+            cache.popitem(last=False)
 
         try:
             result = await func(*args, **kwargs)
