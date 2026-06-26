@@ -1,21 +1,22 @@
 import inspect
-import typing
 import os
+import re
 import shutil
 import subprocess
+import typing
 from typing import Any, get_args, get_origin
+
 from pydantic import BaseModel
-import re
 
 import warera
 
 WIKI_DIR = os.path.join(os.path.dirname(__file__), "api-client-py.wiki")
 REPO_URL = "https://github.com/WarEra-India/api-client-py.wiki.git"
 
-def get_pydantic_models_from_type(t: Any, seen: set | None = None) -> set[type[BaseModel]]:
+def get_pydantic_models_from_type(t: Any, seen: set[Any] | None = None) -> set[type[BaseModel]]:
     if seen is None:
         seen = set()
-    models = set()
+    models: set[type[BaseModel]] = set()
     
     # Handle string forward refs implicitly by just ignoring or trying to resolve if we had a namespace
     if type(t) is typing.ForwardRef:
@@ -30,17 +31,16 @@ def get_pydantic_models_from_type(t: Any, seen: set | None = None) -> set[type[B
         seen.add(t)
         models.add(t)
         # Recurse into fields
-        for field_name, field_info in t.model_fields.items():
+        for _field_name, field_info in t.model_fields.items():
             if field_info.annotation is not None:
                 models.update(get_pydantic_models_from_type(field_info.annotation, seen))
     elif origin:
-        if isinstance(origin, type) and issubclass(origin, BaseModel):
-            if origin not in seen:
-                seen.add(origin)
-                models.add(origin)
-                for field_name, field_info in origin.model_fields.items():
-                    if field_info.annotation is not None:
-                        models.update(get_pydantic_models_from_type(field_info.annotation, seen))
+        if isinstance(origin, type) and issubclass(origin, BaseModel) and origin not in seen:
+            seen.add(origin)
+            models.add(origin)
+            for _field_name, field_info in origin.model_fields.items():
+                if field_info.annotation is not None:
+                    models.update(get_pydantic_models_from_type(field_info.annotation, seen))
         for arg in args:
             models.update(get_pydantic_models_from_type(arg, seen))
     
@@ -56,11 +56,10 @@ def clean_type_str(t: Any) -> str:
     return s
 
 def format_type_with_link(t: str) -> str:
-    def repl(m):
+    def repl(m: re.Match[str]) -> str:
         word = m.group(0)
-        if len(word) > 1 and word[0].isupper() and any(c.islower() for c in word[1:]):
-            if word not in ["Any", "None", "Optional"]:
-                return f'<a href="#{word.lower()}">{word}</a>'
+        if len(word) > 1 and word[0].isupper() and any(c.islower() for c in word[1:]) and word not in ["Any", "None", "Optional"]:
+            return f'<a href="#{word.lower()}">{word}</a>'
         return word
     
     formatted = re.sub(r'[a-zA-Z]+', repl, t)
@@ -144,7 +143,8 @@ def generate_method_markdown(method_name: str, method: Any) -> str:
         lines.append("| Name | Type | Default |")
         lines.append("|---|---|---|")
         for name, param in sig.parameters.items():
-            if name == "self": continue
+            if name == "self":
+                continue
             ptype = clean_type_str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any"
             pdef = param.default if param.default != inspect.Parameter.empty else "*Required*"
             pdef_str = f"`{pdef}`" if pdef != "*Required*" else pdef
@@ -182,16 +182,18 @@ def generate_resource_page(name: str, res: Any) -> str:
         lines.append("")
         
     for method_name in dir(res):
-        if method_name.startswith("_"): continue
+        if method_name.startswith("_"):
+            continue
         method = getattr(res, method_name)
-        if not callable(method): continue
+        if not callable(method):
+            continue
         
         lines.append(generate_method_markdown(method_name, method))
         lines.append("---")
         
     return "\n".join(lines)
 
-def run():
+def run() -> None:
     if os.path.exists(WIKI_DIR):
         print("Pulling latest changes...")
         subprocess.run(["git", "-C", WIKI_DIR, "pull"], check=True)
