@@ -24,6 +24,7 @@ to safely run coroutines without interfering with the main thread's loop.
 from __future__ import annotations
 
 import asyncio
+import atexit
 import functools
 import inspect
 import queue
@@ -58,6 +59,20 @@ def _ensure_loop() -> asyncio.AbstractEventLoop:
             )
             _bg_thread.start()
         return _bg_loop
+
+
+def shutdown() -> None:
+    """Gracefully terminate the background asyncio event loop and thread."""
+    global _bg_loop, _bg_thread
+    with _loop_lock:
+        if _bg_loop is not None and _bg_loop.is_running():
+            _bg_loop.call_soon_threadsafe(_bg_loop.stop)
+            if _bg_thread is not None:
+                _bg_thread.join(timeout=2.0)
+        _bg_loop = None
+        _bg_thread = None
+
+atexit.register(shutdown)
 
 
 def _run(coro: Any) -> Any:
@@ -96,7 +111,7 @@ def _run_async_gen(async_gen: Any) -> Iterator[Any]:
         finally:
             q.put(_sentinel)
 
-    asyncio.run_coroutine_threadsafe(_producer(), loop)
+    task = asyncio.run_coroutine_threadsafe(_producer(), loop)
 
     try:
         while True:
@@ -109,6 +124,7 @@ def _run_async_gen(async_gen: Any) -> Iterator[Any]:
             yield val
     finally:
         stop_event.set()
+        loop.call_soon_threadsafe(task.cancel)
 
 
 def _sync_generator(async_gen_fn: Any, *args: Any, **kwargs: Any) -> Iterator[Any]:

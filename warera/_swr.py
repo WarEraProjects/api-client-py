@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar, cast
 
@@ -18,7 +19,7 @@ class SWRCache:
 
     def __init__(self) -> None:
         # Maps key -> (data, fetch_timestamp)
-        self._cache: dict[str, tuple[Any, float]] = {}
+        self._cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
         # Tracks keys currently being revalidated to avoid duplicate concurrent requests
         self._inflight: dict[str, asyncio.Task[Any]] = {}
 
@@ -32,11 +33,12 @@ class SWRCache:
         - If the key is in cache and fresh, return instantly.
         - If the key is in cache but stale, return instantly and fire a background task to update it.
         """
-        now = time.time()
+
 
         if key in self._cache:
-            data, fetch_time = self._cache[key]
-            if now - fetch_time > ttl_seconds:
+            data, timestamp = self._cache[key]
+            self._cache.move_to_end(key)
+            if time.time() - timestamp > ttl_seconds:
                 logger.debug(
                     f"SWR Cache hit (stale) for '{key}'. Triggering background revalidation."
                 )
@@ -60,6 +62,7 @@ class SWRCache:
 
         loop = asyncio.get_running_loop()
         task = loop.create_task(self._do_fetch(key, fetcher))
+        self._inflight[key] = task
 
         def _log_exc(t: asyncio.Task[T]) -> None:
             if not t.cancelled() and t.exception():
@@ -75,7 +78,7 @@ class SWRCache:
             data = await task
             self._cache[key] = (data, time.time())
             if len(self._cache) > 1000:
-                self._cache.pop(next(iter(self._cache)))
+                self._cache.popitem(last=False)
             return data
         finally:
             self._inflight.pop(key, None)

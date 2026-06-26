@@ -165,10 +165,11 @@ class BatchSession:
                     item._fail(exc.errors[i])
                 elif i in exc.results:
                     item._resolve(exc.results[i])
-        except WareraError as exc:
+        except Exception as exc:
             # Entire chunk failed (e.g. network error)
             for item in chunk:
-                item._fail(exc)
+                if not item._resolved:
+                    item._fail(exc if isinstance(exc, WareraError) else WareraError(str(exc)))
 
     async def __aenter__(self) -> BatchSession:
         return self
