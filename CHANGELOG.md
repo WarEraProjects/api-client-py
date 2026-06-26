@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.2] - 2026-06-26
+
+This release patches several critical memory, concurrency, and parsing issues reported in the 3.1 Pro extended audit.
+
+### 🐛 Bug Fixes & Structural Improvements
+- **OOM Protection in `sync.py`:** Removed `nest_asyncio` and `loop.run_until_complete`. The synchronous wrapper now spawns a dedicated daemon thread running an isolated event loop. Coroutines are securely dispatched via `run_coroutine_threadsafe`, and async generators (`auto_items=True`) are properly streamed through a thread-safe `Queue` instead of blocking and materializing lists in memory.
+- **Cache Memory Limits (`_cache.py`, `_swr.py`):** Added a hard LRU size cap (1000 items) to prevent unbounded memory growth in long-running processes.
+- **Auto-batching InvalidStateError (`_http.py`):** The auto-batch fast path now safely checks `fut.done()` before attempting to `set_result`, preventing background tasks from crashing if the caller timed out.
+- **Rate-limit Race Conditions (`_http.py`):** The rate-limit tracker now handles out-of-order network responses accurately, preventing false "window refresh" inflations.
+- **Strict Dependency Declaration:** Explicitly use standard library `typing.ParamSpec` instead of `typing_extensions` for `_cache.py`.
+- **Unhashable Caching (`_cache.py`):** `async_memoize` now safely stringifies unhashable arguments (like lists/dicts) to ensure SWR hits.
+- **Robust JS Date Parsing (`_pagination.py`):** Changed the fragile hardcoded `[:24]` string slice to a robust `split(" GMT")[0]` when parsing `cursor` dates.
+- **Silent Batch Errors (`_batch.py`):** `fetch_many_by_ids` now correctly distinguishes between missing items (404 Not Found) and real system faults (500s, Rate Limits). Genuine faults are re-raised.
+- **URL Encoding:** Fixed implicit bytes-to-string encoding issues in `orjson.dumps()`.
+- **Restored `collect_all`:** Removed the deprecation warnings from `collect_all` across all resources. It is highly optimized via `parallel_collect_all` and is fully supported.
+
+
 ## [0.2.1] — 2026-06-24
 
 ### 🗺️ New Resource: Alliance
@@ -8,7 +25,7 @@
 - **`alliance.get(alliance_id)`** — fetch a single alliance by ID.
 - **`alliance.get_many(ids)`** — batch-fetch multiple alliances by ID list.
 - **`alliance.get_paginated(...)`** — cursor-paginated alliance listing with full `auto_items=True` and `cursor_end`/`max_pages` support.
-- **`alliance.collect_all()`** — deprecated convenience wrapper that falls through to `parallel_collect_all`; emits `DeprecationWarning`.
+- **`alliance.collect_all()`** — convenience wrapper that falls through to `parallel_collect_all`.
 - New `Alliance`, `AllianceRankings`, `AllianceRankingEntry`, `AllianceMemberCountry` models, all fully typed.
 
 ### 📦 Expanded Model Exports (models `__init__.py`)
@@ -27,9 +44,7 @@ Many models introduced in 0.2.0 were not re-exported from the package root. `war
 - `ReprMixin`, `WareraModel` (for downstream subclassing)
 - `AllianceMemberCountry`, `AllianceRankingEntry`, `AllianceRankings`
 
-### 🔄 `collect_all()` Deprecation Across All Paginated Resources
 
-All resources that previously offered `collect_all()` now emit a `DeprecationWarning` when called and delegate internally to `get_paginated(auto_items=True)` or `parallel_collect_all`. Affected resources: `Alliance`, `Article`, `Battle`, `Event`, `Party`, and any other resource that had the method. This matches the 0.2.0 changelog note that `collect_all()` was rewritten using the parallel time-slicing engine — the deprecation path is now formalized.
 
 ### 🔬 New `async_memoize` Decorator (`_cache.py`)
 

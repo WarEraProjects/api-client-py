@@ -184,13 +184,13 @@ class _RateLimitState:
         if raw_remaining is not None:
             with contextlib.suppress(ValueError):
                 new_remaining = int(raw_remaining)
-                # Detect window refresh: remaining jumped up compared to
-                # what we last saw, meaning the server gave us a fresh window.
-                if self._prev_remaining is not None and new_remaining > self._prev_remaining:
-                    # Note: under high concurrency out-of-order responses may cause this stat to artificially inflate.
+                if self._prev_remaining is None or new_remaining > self._prev_remaining:
                     self.window_refreshes += 1
-                self._prev_remaining = new_remaining
-                self.remaining = new_remaining
+                    self._prev_remaining = new_remaining
+                    self.remaining = new_remaining
+                else:
+                    self.remaining = min(self.remaining or new_remaining, new_remaining)
+                    self._prev_remaining = self.remaining
 
         if raw_reset is not None:
             with contextlib.suppress(ValueError):
@@ -438,9 +438,11 @@ class HttpSession:
             proc, params, fut = queue[0]
             try:
                 res = await self._real_get(proc, params)
-                fut.set_result(res)
+                if not fut.done():
+                    fut.set_result(res)
             except Exception as e:
-                fut.set_exception(e)
+                if not fut.done():
+                    fut.set_exception(e)
             return
 
         procedures = [q[0] for q in queue]
@@ -470,7 +472,7 @@ class HttpSession:
 
         clean = {k: v for k, v in params.items() if v is not None}
         if _orjson is not None:
-            encoded = quote(_orjson.dumps(clean), safe="")
+            encoded = quote(_orjson.dumps(clean).decode("utf-8"), safe="")
         else:
             encoded = quote(json.dumps(clean, separators=(",", ":")), safe="")
         url = f"/{procedure}?input={encoded}"

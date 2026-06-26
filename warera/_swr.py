@@ -72,6 +72,8 @@ class SWRCache:
         try:
             data = await task
             self._cache[key] = (data, time.time())
+            if len(self._cache) > 1000:
+                self._cache.pop(next(iter(self._cache)))
             return data
         finally:
             self._inflight.pop(key, None)
