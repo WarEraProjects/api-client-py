@@ -6,26 +6,18 @@ from .common import WareraModel
 
 
 class GovernmentDates(WareraModel):
-    announcement_created_ats: list[str] | None = Field(
-        default=None, description="The announcement created ats."
-    )
+    announcement_created_ats: list[str] | None = None
 
 
 class Government(WareraModel):
-    dates: GovernmentDates | None = Field(default=None, description="The dates.")
-    country: str | None = Field(
-        default=None, description="The UUID of the country this user holds citizenship in."
-    )
-    country_id: str | None = Field(default=None, description="The country id.")
-    president: str | None = Field(
-        default=None, description="The UUID of the user currently holding the office of President."
-    )
-    vice_president: str | None = Field(default=None, description="The vice president.")
-    min_of_defense: str | None = Field(default=None, description="The min of defense.")
-    min_of_economy: str | None = Field(default=None, description="The min of economy.")
-    min_of_foreign_affairs: str | None = Field(
-        default=None, description="The min of foreign affairs."
-    )
+    dates: GovernmentDates | None = None
+    country: str | None = None
+    country_id: str | None = None
+    president: str | None = None
+    vice_president: str | None = None
+    min_of_defense: str | None = None
+    min_of_economy: str | None = None
+    min_of_foreign_affairs: str | None = None
     # Use default_factory so each Government instance gets its own list.
     # A bare `= []` class-level default would be shared across all instances,
     # which is a classic mutable-default bug even though Pydantic v2 copies it

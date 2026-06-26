@@ -14,17 +14,13 @@ class Donation(WareraModel):
         default=None, validation_alias=AliasChoices("countryId", "country_id")
     )
     party_id: str | None = Field(default=None, validation_alias=AliasChoices("partyId", "party_id"))
-    amount: float | None = Field(default=None, description="The amount.")
-    created_at: str | None = Field(
-        default=None, description="The timestamp when this record was created."
-    )
-    updated_at: str | None = Field(
-        default=None, description="The timestamp when this record was last modified."
-    )
+    amount: float | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class DonationTotals(WareraModel):
     """Aggregate donation totals for a target."""
 
-    total_amount: float | None = Field(default=None, description="The total amount.")
-    donor_count: int | None = Field(default=None, description="The total number of donor.")
+    total_amount: float | None = None
+    donor_count: int | None = None

@@ -22,9 +22,7 @@ class ElectionCandidate(BaseModel):
 class Election(WareraModel):
     """An election event in a country."""
 
-    country: str | None = Field(
-        default=None, description="The UUID of the country this user holds citizenship in."
-    )
+    country: str | None = None
     elected_candidates: list[str] | None = Field(
         default=None,
         validation_alias=AliasChoices("electedCandidates", "elected_candidates"),
@@ -32,8 +30,8 @@ class Election(WareraModel):
     is_active: bool | None = Field(
         default=None, validation_alias=AliasChoices("isActive", "is_active")
     )
-    type: str | None = Field(default=None, description="The type.")
-    candidates: list[ElectionCandidate] | None = Field(default=None, description="The candidates.")
+    type: str | None = None
+    candidates: list[ElectionCandidate] | None = None
     votes_start_at: str | None = Field(
         default=None, validation_alias=AliasChoices("votesStartAt", "votes_start_at")
     )
@@ -46,8 +44,6 @@ class Election(WareraModel):
     elected_count: int | None = Field(
         default=None, validation_alias=AliasChoices("electedCount", "elected_count")
     )
-    created_at: str | None = Field(
-        default=None, description="The timestamp when this record was created."
-    )
-    status: str | None = Field(default=None, description="The status.")
-    votes: dict[str, int] | None = Field(default=None, description="The votes.")
+    created_at: str | None = None
+    status: str | None = None
+    votes: dict[str, int] | None = None

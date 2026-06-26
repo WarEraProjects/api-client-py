@@ -10,11 +10,9 @@ class SearchResult(WareraModel):
     # plain 'id' field, not a MongoDB '_id'. Without this override the alias
     # would cause a plain 'id' key in a raw dict to be missed when using
     # model_validate() with an unaliased dict.
-    type: str | None = Field(
-        default=None, description="The type. Can be user, country, company, mu, or article."
-    )
+    type: str | None = None  # "user" | "country" | "company" | "mu" | "article"
 
 
 class SearchResults(WareraModel):
     results: list[SearchResult] = Field(default_factory=list)
-    total: int | None = Field(default=None, description="The total.")
+    total: int | None = None
