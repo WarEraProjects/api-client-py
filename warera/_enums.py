@@ -74,7 +74,7 @@ class BattleRankingSide(StrEnum):  # type: ignore[misc]
 
 class EventType(StrEnum):  # type: ignore[misc]
     WAR_DECLARED = "warDeclared"
-    PEACE_AGREEMENT = "peaceAgreement"
+    PEACE_AGREEMENT = "peace_agreement"
     BATTLE_OPENED = "battleOpened"
     BATTLE_ENDED = "battleEnded"
     NEW_PRESIDENT = "newPresident"
