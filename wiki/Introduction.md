@@ -6,7 +6,7 @@ This page explains how the library maps to the raw API and the architectural pat
 
 ## How it Maps to the API
 
-If you look at the raw [WarEra tRPC schema](https://github.com/WarEraProjects/TRPC), endpoints are structured as `namespace.procedureName` (e.g., `country.getAllCountries`).
+If you look at the raw [WarEra tRPC schema](https://api2.warera.io/docs), endpoints are structured as `namespace.procedureName` (e.g., `country.getAllCountries`).
 
 This client library maps those exactly 1-to-1:
 - `country` becomes `client.country`
