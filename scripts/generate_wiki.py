@@ -44,6 +44,7 @@ def clean_type_str(t: Any) -> str:
     s = str(t)
     s = s.replace("typing.", "").replace("warera.resources.", "").replace("warera.models.", "").replace("warera._enums.", "")
     s = re.sub(r"<class '([^']+)'>", r"\1", s)
+    s = s.replace("|", "\\|")
     return s
 
 def generate_schema_markdown(model: type[BaseModel]) -> str:
@@ -88,10 +89,12 @@ def generate_schema_markdown(model: type[BaseModel]) -> str:
                     types.append(t)
                 elif "$ref" in sub:
                     types.append(sub["$ref"].split("/")[-1])
-            type_str = " | ".join(types)
+            type_str = " \\| ".join(types)
             
-        req_mark = "Yes" if field_name in required else "No"
+        req_mark = "✅" if field_name in required else "❌"
         desc = field_info.get("description", "")
+        
+        type_str = type_str.replace("|", "\\|")
         
         lines.append(f"| `{field_name}` | `{type_str}` | {req_mark} | {desc} |")
         
