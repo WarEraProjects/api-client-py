@@ -162,6 +162,7 @@ class UserPreferences(WareraModel):
     app_pattern: str | None = None
     locale: str | None = None
     sfx: bool | None = None
+    colorblind: bool | None = None
 
 
 class UserLite(WareraModel):
