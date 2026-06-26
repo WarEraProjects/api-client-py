@@ -357,11 +357,11 @@ await client.event.get_paginated(auto_items=True, **kwargs)                     
 await client.event.collect_all(**kwargs) -> list[Event]
 ```
 
-`EventType` - 21 values:
+`EventType` - 26 values:
 
 | Category | Values |
 |---|---|
-| War & Peace | `WAR_DECLARED` `PEACE_AGREEMENT` `PEACE_MADE` `ALLIANCE_FORMED` `ALLIANCE_BROKEN` |
+| War & Peace | `WAR_DECLARED` `PEACE_AGREEMENT` `PEACE_MADE` `ALLIANCE_FORMED` `ALLIANCE_BROKEN` `ALLIANCE_MEMBER_JOINED` `ALLIANCE_MEMBER_LEFT` `ALLIANCE_MEMBER_EXCLUDED` `DEFENSIVE_PACT_FORMED` `DEFENSIVE_PACT_BROKEN` |
 | Battle | `BATTLE_OPENED` `BATTLE_ENDED` |
 | Territory | `REGION_TRANSFER` `REGION_LIBERATED` `STRATEGIC_RESOURCES_RESHUFFLED` |
 | Politics | `NEW_PRESIDENT` `SYSTEM_REVOLT` `REVOLUTION_STARTED` `REVOLUTION_ENDED` `FINANCED_REVOLT` |
@@ -394,7 +394,7 @@ print(f"Total capital in buy orders: {summary.total_buy_money_invested:.2f}")
 await client.work_offer.get(work_offer_id: str) -> WorkOffer
 await client.work_offer.get_by_company(company_id: str) -> list[WorkOffer]
 await client.work_offer.get_paginated(*, limit=10, cursor=None, user_id=None,
-    region_id=None, energy=None, production=None, citizenship=None) -> CursorPage[WorkOffer]
+    region_id=None, energy=None, production=None, citizenship=None, level=None) -> CursorPage[WorkOffer]
 await client.work_offer.get_paginated(auto_items=True, **kwargs)                     # async generator
 await client.work_offer.collect_all(**kwargs) -> list[WorkOffer]
 await client.work_offer.get_wage_stats(*, energy, production, citizenship) -> WageStats
@@ -729,8 +729,8 @@ warera/
 ## Development
 
 ```bash
-git clone https://github.com/bipinkrish/warera-py-api
-cd warera-py-api
+git clone https://github.com/warera-india/api-client-py
+cd api-client-py
 pip install -e ".[dev]"
 
 # Unit tests (no API key needed)

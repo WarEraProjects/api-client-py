@@ -6,7 +6,11 @@ on:
       - 'v*'
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
   publish:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # Required for Trusted Publishing

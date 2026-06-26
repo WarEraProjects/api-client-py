@@ -89,7 +89,12 @@ class _SyncResourceProxy:
 
             @functools.wraps(attr)
             def sync_method(*args: Any, **kwargs: Any) -> Any:
-                return _run(attr(*args, **kwargs))
+                result = _run(attr(*args, **kwargs))
+                if inspect.isasyncgen(result):
+                    async def _drain(gen: Any) -> list[Any]:
+                        return [item async for item in gen]
+                    return _run(_drain(result))
+                return result
 
             return sync_method
 

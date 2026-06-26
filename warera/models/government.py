@@ -5,12 +5,6 @@ from pydantic import Field
 from .common import WareraModel
 
 
-class GovernmentMember(WareraModel):
-    user_id: str | None = None
-    role: str | None = None
-    party_id: str | None = None
-
-
 class GovernmentDates(WareraModel):
     announcement_created_ats: list[str] | None = None
 

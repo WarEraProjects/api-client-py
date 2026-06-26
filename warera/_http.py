@@ -187,6 +187,7 @@ class _RateLimitState:
                 # Detect window refresh: remaining jumped up compared to
                 # what we last saw, meaning the server gave us a fresh window.
                 if self._prev_remaining is not None and new_remaining > self._prev_remaining:
+                    # Note: under high concurrency out-of-order responses may cause this stat to artificially inflate.
                     self.window_refreshes += 1
                 self._prev_remaining = new_remaining
                 self.remaining = new_remaining
@@ -409,9 +410,11 @@ class HttpSession:
         Returns stale data instantly if available, while fetching fresh data in the background.
         """
         # Create a deterministic cache key
-        import json
         key_dict = {"p": procedure, "args": params}
-        key = json.dumps(key_dict, sort_keys=True)
+        if _orjson is not None:
+            key = _orjson.dumps(key_dict, option=_orjson.OPT_SORT_KEYS).decode("utf-8")
+        else:
+            key = json.dumps(key_dict, sort_keys=True)
         
         async def fetcher() -> Any:
             return await self.get(procedure, params)

@@ -57,8 +57,13 @@ class SWRCache:
             return
 
         loop = asyncio.get_running_loop()
-        # Fire and forget the background task
-        loop.create_task(self._do_fetch(key, fetcher))
+        task = loop.create_task(self._do_fetch(key, fetcher))
+
+        def _log_exc(t: asyncio.Task[T]) -> None:
+            if not t.cancelled() and t.exception():
+                logger.warning(f"Background revalidation failed for '{key}': {t.exception()}")
+
+        task.add_done_callback(_log_exc)
 
     async def _do_fetch(self, key: str, fetcher: Callable[[], Coroutine[Any, Any, T]]) -> T:
         """Execute the fetcher, store the result, and manage the inflight lock."""

@@ -54,7 +54,15 @@ The sync shim (`warera.sync`) now detects when it is called from inside a runnin
 - `test_enhancements.py` — model `__str__` / `__repr__` tests, `ReprMixin` coverage, `CursorPage` iteration and `len()`, `BaseResource.__str__`, `WareraClient.__str__`, and `BatchItem` lifecycle display.
 - `test_custom_resources.py` — unit tests for newer resource namespaces: `Alliance`, `Party`, `Election`, `Donation`, `GameStat`, `MuMember`, `Work`, `WorkOffer`, `ItemTrading`, `Company`.
 
----
+### Bug Fixes & Architecture Parity
+- Add missing 32 sub-models to root namespace and `__all__`.
+- Implement `invalidate_cache()` across cache-holding resources.
+- Correctly bump internal `__version__` variable to `0.2.1`.
+- Fix async generator leak in `_SyncResourceProxy` causing failures in synchronous mode with `auto_items=True`.
+- Update deprecation message across pagination endpoints.
+- Update `EventType.PEACE_AGREEMENT` to camelCase `peaceAgreement`.
+- Add test gates to PyPI publishing workflow.
+- Update `pyproject.toml` repository links.
 
 ## [0.2.0] — 2026-05-27
 

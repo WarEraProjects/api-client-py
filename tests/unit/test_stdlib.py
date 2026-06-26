@@ -691,31 +691,8 @@ class TestClientAssembly(unittest.TestCase):
         with mock.patch("warera.client.HttpSession", return_value=fake_http):
             client = WareraClient(api_key="test")
 
-        expected = [
-            "user",
-            "company",
-            "country",
-            "government",
-            "region",
-            "battle",
-            "battle_ranking",
-            "battle_order",
-            "round",
-            "event",
-            "item_trading",
-            "work_offer",
-            "worker",
-            "mu",
-            "ranking",
-            "transaction",
-            "upgrade",
-            "article",
-            "search",
-            "game_config",
-            "inventory",
-            "action_log",
-        ]
-        for attr in expected:
+        import warera
+        for attr in warera._RESOURCE_NAMES:
             self.assertTrue(hasattr(client, attr), f"Missing resource: {attr}")
 
     def test_batch_returns_batch_session(self):

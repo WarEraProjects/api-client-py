@@ -130,7 +130,7 @@ class BattleResource(BaseResource):
         import warnings
 
         warnings.warn(
-            "`collect_all()` is deprecated. Use `get_all()` directly.",
+            "`collect_all()` is deprecated. Use `get_paginated(auto_items=True)` directly.",
             DeprecationWarning,
             stacklevel=2,
         )
