@@ -72,10 +72,24 @@ def _run_async_gen(async_gen: Any) -> Iterator[Any]:
     loop = _ensure_loop()
     q: queue.Queue[Any] = queue.Queue()
     _sentinel = object()
+    stop_event = threading.Event()
 
     async def _producer() -> None:
         try:
             async for item in async_gen:
+                if stop_event.is_set():
+                    break
+
+                # Backpressure: wait if the queue is getting large so we don't blow out memory
+                # Check periodically to ensure we notice stop_event
+                while q.qsize() > 50:
+                    await asyncio.sleep(0.05)
+                    if stop_event.is_set():
+                        break
+
+                if stop_event.is_set():
+                    break
+
                 q.put((True, item))
         except Exception as e:
             q.put((False, e))
@@ -84,14 +98,17 @@ def _run_async_gen(async_gen: Any) -> Iterator[Any]:
 
     asyncio.run_coroutine_threadsafe(_producer(), loop)
 
-    while True:
-        msg = q.get()
-        if msg is _sentinel:
-            break
-        ok, val = msg
-        if not ok:
-            raise val
-        yield val
+    try:
+        while True:
+            msg = q.get()
+            if msg is _sentinel:
+                break
+            ok, val = msg
+            if not ok:
+                raise val
+            yield val
+    finally:
+        stop_event.set()
 
 
 def _sync_generator(async_gen_fn: Any, *args: Any, **kwargs: Any) -> Iterator[Any]:
@@ -140,9 +157,10 @@ class _SyncResourceProxy:
 
             return sync_gen
 
-        # Check if the attr itself is a callable that returns an asyncgen, 
+        # Check if the attr itself is a callable that returns an asyncgen,
         # but isn't strictly an asyncgen function (e.g. decorators)
         if callable(attr):
+
             @functools.wraps(attr)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
                 res = attr(*args, **kwargs)
@@ -156,6 +174,7 @@ class _SyncResourceProxy:
                         return ret
                 else:
                     return res
+
             return wrapper
 
         return attr

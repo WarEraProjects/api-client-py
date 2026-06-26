@@ -97,5 +97,7 @@ def test_user_parses_dict_shaped_skin_keys_and_tours():
     assert user.finished_tours["onboarding"] is True
 
     # Empty maps and absent fields must also parse.
-    assert User.model_validate({"_id": "u2", "equippedSkinKeys": {}, "finishedTours": {}}).id == "u2"
+    assert (
+        User.model_validate({"_id": "u2", "equippedSkinKeys": {}, "finishedTours": {}}).id == "u2"
+    )
     assert User.model_validate({"_id": "u3"}).finished_tours is None

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
+from .battle import Battle
 from .common import WareraModel
 
 
@@ -79,7 +78,7 @@ class Region(WareraModel):
     active_upgrade_levels: RegionActiveUpgradeLevels | None = None
     upgrades_v2: RegionUpgradesV2 | None = None
     # Full battle object when a battle is active on this region.
-    active_battle: dict[str, Any] | None = None
+    active_battle: Battle | None = None
     last_battle_ended_at: str | None = None
     last_resistance_contribution_at: str | None = None
     last_revolt_ended_at: str | None = None

@@ -692,6 +692,7 @@ class TestClientAssembly(unittest.TestCase):
             client = WareraClient(api_key="test")
 
         import warera
+
         for attr in warera._RESOURCE_NAMES:
             self.assertTrue(hasattr(client, attr), f"Missing resource: {attr}")
 

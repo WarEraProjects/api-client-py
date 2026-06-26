@@ -231,7 +231,9 @@ class _RateLimitState:
                 if wait_secs > 0:
                     jitter = random.uniform(0.01, 0.5)
                     self.total_wait_seconds += wait_secs + jitter
-                    logger.warning(f"Rate limit exhausted. Sleeping for {wait_secs:.2f}s + {jitter:.2f}s jitter...")
+                    logger.warning(
+                        f"Rate limit exhausted. Sleeping for {wait_secs:.2f}s + {jitter:.2f}s jitter..."
+                    )
                     await asyncio.sleep(wait_secs + jitter)
                 # Reset state — next response will give us fresh values.
                 self.remaining = None
@@ -282,7 +284,8 @@ class HttpSession:
         self._on_retry = on_retry
         self._swr_cache = SWRCache()
         self._retryable_status_codes = frozenset(
-            retryable_status_codes if retryable_status_codes is not None 
+            retryable_status_codes
+            if retryable_status_codes is not None
             else {408, 409, 425, 429, 500, 502, 503, 504}
         )
 
@@ -397,7 +400,9 @@ class HttpSession:
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._auto_batch_queue.append((procedure, params, fut))
-        logger.debug(f"Queuing '{procedure}' for auto-batching (queue size: {len(self._auto_batch_queue)})")
+        logger.debug(
+            f"Queuing '{procedure}' for auto-batching (queue size: {len(self._auto_batch_queue)})"
+        )
 
         if self._auto_batch_task is None:
             self._auto_batch_task = loop.create_task(self._auto_batch_flush())
@@ -415,7 +420,7 @@ class HttpSession:
             key = _orjson.dumps(key_dict, option=_orjson.OPT_SORT_KEYS).decode("utf-8")
         else:
             key = json.dumps(key_dict, sort_keys=True)
-        
+
         async def fetcher() -> Any:
             return await self.get(procedure, params)
 
@@ -460,8 +465,8 @@ class HttpSession:
                     continue
                 if i in exc.errors:
                     fut.set_exception(exc.errors[i])
-                elif i in exc.results:
-                    fut.set_result(exc.results[i])
+                else:
+                    fut.set_result(exc.results.get(i))
         except Exception as e:
             for fut in futs:
                 if not fut.done():

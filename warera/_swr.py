@@ -37,7 +37,9 @@ class SWRCache:
         if key in self._cache:
             data, fetch_time = self._cache[key]
             if now - fetch_time > ttl_seconds:
-                logger.debug(f"SWR Cache hit (stale) for '{key}'. Triggering background revalidation.")
+                logger.debug(
+                    f"SWR Cache hit (stale) for '{key}'. Triggering background revalidation."
+                )
                 self._revalidate(key, fetcher)
             else:
                 logger.debug(f"SWR Cache hit (fresh) for '{key}'.")

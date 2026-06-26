@@ -16,9 +16,7 @@ class Upgrade(WareraModel):
     company_id: str | None = Field(
         default=None, validation_alias=AliasChoices("company", "companyId", "company_id")
     )
-    mu_id: str | None = Field(
-        default=None, validation_alias=AliasChoices("mu", "muId", "mu_id")
-    )
+    mu_id: str | None = Field(default=None, validation_alias=AliasChoices("mu", "muId", "mu_id"))
     invested_money: float | None = None
     invested_concrete: float | None = None
     invested_steel: float | None = None

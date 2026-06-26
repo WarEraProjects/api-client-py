@@ -186,7 +186,6 @@ class WorkOfferResource(BaseResource):
             return WageStats(raw)
         return WageStats({})
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[WorkOffer]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings

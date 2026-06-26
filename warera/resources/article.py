@@ -120,7 +120,6 @@ class ArticleResource(BaseResource):
         )
         return CursorPage.from_raw(raw, ArticleLite)
 
-
     async def collect_all(self, **kwargs: typing.Any) -> list[ArticleLite]:
         """Fetch all items across all pages concurrently using parallel time-slicing."""
         import warnings
