@@ -373,6 +373,78 @@ async def test_company_get_production_bonus_empty():
     assert bonus.total == 0.0
 
 
+def test_company_id_page_parses_string_ids():
+    from warera.resources.company import _company_id_page
+
+    page = _company_id_page(
+        {
+            "items": ["c1", "c2"],
+            "nextCursor": "cursor-1",
+        }
+    )
+    assert page.items == ["c1", "c2"]
+    assert page.next_cursor == "cursor-1"
+    assert page.has_more is True
+
+
+def test_company_id_page_parses_dict_items_defensively():
+    from warera.resources.company import _company_id_page
+
+    page = _company_id_page(
+        {
+            "items": [{"_id": "c1", "name": "Alpha"}, {"id": "c2"}],
+        }
+    )
+    assert page.items == ["c1", "c2"]
+    assert page.has_more is False
+
+
+@pytest.mark.asyncio
+async def test_company_get_companies_returns_ids():
+    raw = {
+        "items": ["6a799ab1072639fe7ac9b76e", "6a73502669b197f5862aa9f7"],
+        "nextCursor": "Mon Aug 10 2026 11:19:08 GMT+0000|6a73502669b197f5862aa9f7",
+    }
+    resource = CompanyResource(_mock_http(raw))
+    page = await resource.get_companies(user_id="u1", per_page=20)
+
+    assert len(page) == 2
+    assert page.items == [
+        "6a799ab1072639fe7ac9b76e",
+        "6a73502669b197f5862aa9f7",
+    ]
+    assert page.has_more is True
+    resource._http.get.assert_awaited_once_with(
+        "company.getCompanies",
+        {"userId": "u1", "perPage": 20},
+    )
+
+
+@pytest.mark.asyncio
+async def test_company_get_by_user_hydrates_companies():
+    http = MagicMock()
+    http.get = AsyncMock(
+        return_value={
+            "items": ["c1", "c2"],
+        }
+    )
+    http.post_batch = AsyncMock(
+        return_value=[
+            {"_id": "c1", "name": "Alpha"},
+            {"_id": "c2", "name": "Beta"},
+        ]
+    )
+    resource = CompanyResource(http)
+    companies = await resource.get_by_user("u1")
+
+    assert len(companies) == 2
+    assert companies[0].id == "c1"
+    assert companies[0].name == "Alpha"
+    assert companies[1].id == "c2"
+    assert companies[1].name == "Beta"
+    http.post_batch.assert_awaited_once()
+
+
 # ---------------------------------------------------------------------------
 # WorkOffer — wage stats
 # ---------------------------------------------------------------------------

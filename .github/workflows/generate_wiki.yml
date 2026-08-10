@@ -6,7 +6,6 @@ on:
       branch:
         description: 'Branch to generate Wiki for'
         required: true
-        default: 'version-0.2.2'
 
 jobs:
   generate:
