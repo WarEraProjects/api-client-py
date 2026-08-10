@@ -17,7 +17,5 @@ logs = await warera.transaction.collect_all(
 )
 ```
 
-> [!WARNING]
-> **Rate Limit Note**: A `concurrency=500` will instantly saturate the API's global rate limit of 500 requests per minute. The library implements transparent 429 backoff protection via jitter, but hitting the API this hard may cause `502 Bad Gateway` errors from upstream load balancers if you are querying highly demanding databases. Dial down `concurrency` to 100 if you experience random disconnects.
-
-
+!!! warning
+    **Rate Limit Note**: A `concurrency=500` will instantly saturate the API's global rate limit of 500 requests per minute. The library implements transparent 429 backoff protection via jitter, but hitting the API this hard may cause `502 Bad Gateway` errors from upstream load balancers if you are querying highly demanding databases. Dial down `concurrency` to 100 if you experience random disconnects.

@@ -118,4 +118,4 @@ if __name__ == "__main__":
 
 ## Next Steps
 
-Now that you know the basics, check out the [Code Snippets](Code-Snippets) page for quick copy-paste examples of common tasks, or explore the [API Reference](API-Reference) to see all the endpoints available!
+Now that you know the basics, check out the [Code Snippets](code-snippets.md) page for quick copy-paste examples of common tasks, or explore the [API Reference](reference/index.md) to see all the endpoints available!
