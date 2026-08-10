@@ -49,8 +49,8 @@ async def main():
 2. **Smart Caching**: Heavy endpoints like `game_config` are cached in memory and served instantly using a Stale-While-Revalidate pattern.
 3. **Time-Slice Pagination**: Grab thousands of records instantly using the `collect_all()` engine.
 
-To learn more about these powerful features, visit the [Advanced Usage](Advanced-Usage) page!
+To learn more about these powerful features, visit the [Advanced Usage](advanced-usage.md) page!
 
 ## API Reference
 
-Check out the [API Reference](API-Reference) to explore all 32 available resource namespaces and their perfectly typed models.
+Check out the [API Reference](reference/index.md) to explore all 32 available resource namespaces and their perfectly typed models.

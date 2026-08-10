@@ -87,9 +87,9 @@ async for party in client.party.get_paginated(country_id="7", auto_items=True):
 all_parties = await client.party.collect_all(country_id="7")
 ```
 
-> [!WARNING]
-> **Extreme Throughput Caution**: The `collect_all` and `get_many` engines default to an extreme concurrency of `500` (and `time_slice_days=0.2`) to perfectly saturate the 500 req/min API rate limit. While the client safely protects against 429 errors and DDoS mitigation logic by jittering bursts, this concurrency can cause 502 Bad Gateway errors on the API side if querying heavy endpoints (like thousands of transactions), or hit OS File Descriptor limits locally.
-> You can globally dial down the concurrency limit by setting the `WARERA_MAX_CONCURRENCY` environment variable (e.g. `export WARERA_MAX_CONCURRENCY=50`), or by overriding `concurrency=100` and `time_slice_days=1` directly in the `collect_all` method call.
+!!! warning
+    **Extreme Throughput Caution**: The `collect_all` and `get_many` engines default to an extreme concurrency of `500` (and `time_slice_days=0.2`) to perfectly saturate the 500 req/min API rate limit. While the client safely protects against 429 errors and DDoS mitigation logic by jittering bursts, this concurrency can cause 502 Bad Gateway errors on the API side if querying heavy endpoints (like thousands of transactions), or hit OS File Descriptor limits locally.
+    You can globally dial down the concurrency limit by setting the `WARERA_MAX_CONCURRENCY` environment variable (e.g. `export WARERA_MAX_CONCURRENCY=50`), or by overriding `concurrency=100` and `time_slice_days=1` directly in the `collect_all` method call.
 
 ### 4. Static Resources Caching (SWR)
 

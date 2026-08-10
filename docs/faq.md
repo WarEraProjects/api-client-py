@@ -63,4 +63,4 @@ Make sure you have `pydantic >= 2.0.0` installed. This library relies heavily on
 
 Do **not** manually loop over pages. Instead, use the built-in `collect_all()` method available on supported resources. 
 
-`collect_all()` uses time-sliced synthetic cursors to divide the timeline into chunks and fires hundreds of requests concurrently, fetching massive datasets in seconds. See the [Advanced Usage](Advanced-Usage) page for a guide!
+`collect_all()` uses time-sliced synthetic cursors to divide the timeline into chunks and fires hundreds of requests concurrently, fetching massive datasets in seconds. See the [Advanced Usage](advanced-usage.md) page for a guide!

@@ -119,7 +119,7 @@ async with WareraClient(api_key="YOUR_KEY") as client:
 
 ## All Resource Methods
 
-For a complete, detailed list of all 32 resource namespaces, their signatures, and the returned Pydantic models, please refer to the **[API Reference Wiki](https://github.com/warera-india/api-client-py/wiki/API-Reference)**.
+For a complete, detailed list of all 32 resource namespaces, their signatures, and the returned Pydantic models, please refer to the **[API Reference](https://warera-india.github.io/api-client-py/reference/)**.
 
 ---
 
