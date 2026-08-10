@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Bug Fixes
+- **`company.getCompanies` ID dropping:** The API returns a page of company ID strings, but `CursorPage.from_raw(..., Company)` discarded every non-dict item, so `get_companies` / `get_by_user` / `collect_by_users` always looked empty. `get_companies` (and `collect_all`) now return those IDs; `get_by_user` and `collect_by_users` hydrate them into full `Company` objects via `get_many`.
+- **`worker.getWorkers` empty list:** The API returns `{type, workers: [...]}`, but the client only read `items`/`data`, so `get_workers()` always returned `[]`. It now reads `workers` (with `items`/`data` fallbacks) and maps `user`/`company`/`wage`/`joinedAt` onto the `Worker` model.
+
 ## [0.2.2] — 2026-06-26
 
 This release patches several critical memory, concurrency, and parsing issues reported in the 3.1 Pro extended audit.

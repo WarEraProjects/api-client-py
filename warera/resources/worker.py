@@ -27,13 +27,14 @@ class WorkerResource(BaseResource):
             userId=user_id,
         )
         if isinstance(raw, list):
-            return [Worker.model_validate(w) for w in raw]
+            return [Worker.model_validate(w) for w in raw if isinstance(w, dict)]
         if isinstance(raw, dict):
-            raw_items = raw.get("items", raw.get("data", []))
-            items = raw_items if isinstance(raw_items, list) else []
+            # Live API returns ``{type, workers: [...]}``; keep items/data as fallbacks.
+            candidate = raw.get("workers", raw.get("items", raw.get("data", [])))
+            items = candidate if isinstance(candidate, list) else []
         else:
             items = []
-        return [Worker.model_validate(w) for w in items]
+        return [Worker.model_validate(w) for w in items if isinstance(w, dict)]
 
     async def get_total_count(self, user_id: str) -> int:
         """Get the total number of workers employed by a user across all their companies."""

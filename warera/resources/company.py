@@ -73,6 +73,40 @@ class RecommendedRegion(ReprMixin):
         self.item_code: str | None = raw.get("itemCode")
 
 
+def _company_id_page(raw: Any) -> CursorPage[str]:
+    """
+    Parse ``company.getCompanies`` responses into a page of company ID strings.
+
+    The API returns ``{items: [<id>, ...], nextCursor}`` (IDs, not full objects).
+    Dict items are accepted defensively by reading ``_id`` / ``id``.
+    """
+    if isinstance(raw, list):
+        raw_items: list[Any] = raw
+        next_cursor = None
+        has_more = False
+    elif isinstance(raw, dict):
+        candidate = raw.get("items", raw.get("data", []))
+        raw_items = candidate if isinstance(candidate, list) else []
+        next_cursor = raw.get("nextCursor") or raw.get("next_cursor")
+        has_more = bool(raw.get("hasMore", raw.get("has_more", bool(next_cursor))))
+    else:
+        return CursorPage(items=[], next_cursor=None, has_more=False)
+
+    items: list[str] = []
+    for item in raw_items:
+        if isinstance(item, str):
+            if item:
+                items.append(item)
+        elif isinstance(item, dict):
+            cid = item.get("_id") or item.get("id")
+            if cid is not None and str(cid):
+                items.append(str(cid))
+        elif item is not None and str(item):
+            items.append(str(item))
+
+    return CursorPage(items=items, next_cursor=next_cursor, has_more=has_more)
+
+
 class CompanyResource(BaseResource):
     """
     Endpoints:
@@ -97,7 +131,7 @@ class CompanyResource(BaseResource):
         auto_items: typing.Literal[True],
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> AsyncIterator[Company]: ...
+    ) -> AsyncIterator[str]: ...
 
     @typing.overload
     async def get_companies(
@@ -109,7 +143,7 @@ class CompanyResource(BaseResource):
         auto_items: typing.Literal[False] = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Company]: ...
+    ) -> CursorPage[str]: ...
 
     async def get_companies(
         self,
@@ -120,8 +154,13 @@ class CompanyResource(BaseResource):
         auto_items: bool = False,
         max_pages: int | float = float("inf"),
         cursor_end: str | None = None,
-    ) -> CursorPage[Company] | AsyncIterator[Company]:
-        """Get companies, optionally filtered by owner user ID (cursor-paginated)."""
+    ) -> CursorPage[str] | AsyncIterator[str]:
+        """
+        List company IDs, optionally filtered by owner user ID (cursor-paginated).
+
+        The WarEra API returns ID strings only. Use :meth:`get_by_user` or
+        :meth:`get_many` when you need full :class:`Company` objects.
+        """
         if auto_items:
             from .._pagination import auto_paginate_items
 
@@ -140,14 +179,22 @@ class CompanyResource(BaseResource):
             perPage=per_page,
             cursor=cursor,
         )
-        return CursorPage.from_raw(raw, Company)
+        return _company_id_page(raw)
 
     async def get_by_user(self, user_id: str, **kwargs: Any) -> list[Company]:
-        """Convenience: fetch all companies owned by a user (collects all pages)."""
-        items = []
-        async for item in await self.get_companies(user_id=user_id, auto_items=True, **kwargs):
-            items.append(item)
-        return items
+        """
+        Convenience: fetch all companies owned by a user (collects all pages).
+
+        Paginated ID listing is hydrated via :meth:`get_many` into full
+        :class:`Company` objects.
+        """
+        ids: list[str] = []
+        async for company_id in await self.get_companies(
+            user_id=user_id, auto_items=True, **kwargs
+        ):
+            ids.append(company_id)
+        companies = await self.get_many(ids)
+        return [c for c in companies if c is not None]
 
     async def collect_all(
         self,
@@ -155,10 +202,13 @@ class CompanyResource(BaseResource):
         time_slice_days: int = 30,
         concurrency: int = 500,
         **kwargs: Any,
-    ) -> list[Company]:
+    ) -> list[str]:
         """
-        Convenience: fetch all companies globally (or by country if passed) using parallel slicing.
-        This is much faster than fetching sequentially.
+        Convenience: fetch all company IDs globally (or by country if passed)
+        using parallel slicing. This is much faster than fetching sequentially.
+
+        Returns ID strings as exposed by ``company.getCompanies``. Hydrate with
+        :meth:`get_many` when full objects are needed.
         """
         from .._pagination import parallel_collect_all
 
@@ -264,7 +314,7 @@ class CompanyResource(BaseResource):
         if not user_ids:
             return []
 
-        all_companies: list[Company] = []
+        all_ids: list[str] = []
         current_queries = [{"userId": uid} for uid in user_ids]
 
         # Loop until all pages for all users have been fetched
@@ -283,11 +333,12 @@ class CompanyResource(BaseResource):
             # Process results and check for next pages
             for q, item in items:
                 if item.ok:
-                    page = CursorPage.from_raw(item.result, Company)
-                    all_companies.extend(page.items)
+                    page = _company_id_page(item.result)
+                    all_ids.extend(page.items)
                     if page.has_more and page.next_cursor:
                         next_queries.append({**q, "cursor": page.next_cursor})
 
             current_queries = next_queries
 
-        return all_companies
+        companies = await self.get_many(all_ids, concurrency=concurrency)
+        return [c for c in companies if c is not None]
