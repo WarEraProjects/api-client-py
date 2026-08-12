@@ -3,6 +3,7 @@
 ## [0.2.4] — 2026-08-12
 
 ### Bug Fixes
+- **`war.getById` Schema & Parameter Fix:** The `WarResource` was completely broken: it was incorrectly passing `id` instead of `warId` to the API, and the Pydantic model (`War`) was missing all its nested fields (`attacker`, `defender`, `is_active`, etc.). It has been rewritten to perfectly match the live API's payload structure and successfully parses all objects.
 - **`company.getCompanies` ID dropping:** The API returns a page of company ID strings, but `CursorPage.from_raw(..., Company)` discarded every non-dict item, so `get_companies` / `get_by_user` / `collect_by_users` always looked empty. `get_companies` (and `collect_all`) now return those IDs; `get_by_user` and `collect_by_users` hydrate them into full `Company` objects via `get_many`.
 - **`worker.getWorkers` empty list:** The API returns `{type, workers: [...]}`, but the client only read `items`/`data`, so `get_workers()` always returned `[]`. It now reads `workers` (with `items`/`data` fallbacks) and maps `user`/`company`/`wage`/`joinedAt` onto the `Worker` model.
 
