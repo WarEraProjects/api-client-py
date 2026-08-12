@@ -212,10 +212,16 @@ async def test_user_get_by_country_cursor_page():
 
 @pytest.mark.asyncio
 async def test_war_get_parses_model():
-    raw = {"id": "w1", "status": "ACTIVE", "attackerId": "7", "defenderId": "8"}
+    raw = {
+        "id": "w1",
+        "isActive": True,
+        "attacker": {"country": "7", "wonBattlesCount": 0, "wonRoundsCount": 0, "damages": 0},
+        "defender": {"country": "8", "wonBattlesCount": 0, "wonRoundsCount": 0, "damages": 0}
+    }
     resource = WarResource(_mock_http(raw))
     war = await resource.get("w1")
 
     assert war.id == "w1"
-    assert war.status == "ACTIVE"
-    assert war.attacker_id == "7"
+    assert war.is_active is True
+    assert war.attacker.country_id == "7"
+    assert war.defender.country_id == "8"
