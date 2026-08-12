@@ -14,5 +14,5 @@ class WarResource(BaseResource):
 
     async def get(self, war_id: str) -> War:
         """Get a war by its ID."""
-        raw = await self._get("war.getById", id=war_id)
+        raw = await self._get("war.getById", warId=war_id)
         return War.model_validate(raw)
