@@ -7,8 +7,6 @@
 
 > A robust, fully-typed, async-first Python client for the [WarEra](https://warera.io) tRPC API (v0.25.0-beta).
 > 
-> **⚠️ Upgrading from v0.1.x?** Please read the [v0.2.0 Migration Guide](https://github.com/wareraprojects/api-client-py/wiki/Migration-Guide).
-> 
 ```python
 import warera
 
@@ -119,7 +117,7 @@ async with WareraClient(api_key="YOUR_KEY") as client:
 
 ## All Resource Methods
 
-For a complete, detailed list of all 32 resource namespaces, their signatures, and the returned Pydantic models, please refer to the **[API Reference Wiki](https://github.com/wareraprojects/api-client-py/wiki/API-Reference)**.
+For a complete, detailed list of all 32 resource namespaces, their signatures, and the returned Pydantic models, please refer to the **[API Reference Documentation](https://wareraprojects.github.io/api-client-py/reference/)**.
 
 ---
 
