@@ -144,15 +144,25 @@ def run(coro):
 
 class TestEnums(unittest.TestCase):
     def test_article_type_values(self):
-        expected = {"daily", "weekly", "top", "my", "subscriptions", "last"}
+        expected = {
+            "daily",
+            "weekly",
+            "top",
+            "my",
+            "subscriptions",
+            "last",
+            "country",
+            "mu",
+            "user",
+        }
         self.assertEqual({e.value for e in ArticleType}, expected)
 
     def test_battle_filter_values(self):
         self.assertIn("yourCountry", [e.value for e in BattleFilter])
         self.assertIn("yourEnemies", [e.value for e in BattleFilter])
 
-    def test_ranking_type_has_33_values(self):
-        self.assertEqual(len(RankingType), 33)
+    def test_ranking_type_has_34_values(self):
+        self.assertEqual(len(RankingType), 34)
 
     def test_event_type_has_26_values(self):
         self.assertEqual(len(EventType), 26)
@@ -471,7 +481,7 @@ class TestBatchSession(unittest.TestCase):
         )
 
         async def go():
-            async with BatchSession(http, batch_size=2) as batch:
+            async with BatchSession(http, max_batch_size=2) as batch:
                 a = batch.add("company.getById", {"companyId": "1"})
                 b = batch.add("company.getById", {"companyId": "2"})
                 c = batch.add("company.getById", {"companyId": "3"})
@@ -549,7 +559,9 @@ class TestFetchManyByIds(unittest.TestCase):
             ]
         )
         results = run(
-            fetch_many_by_ids(http, "company.getById", "companyId", ["1", "2", "3"], batch_size=2)
+            fetch_many_by_ids(
+                http, "company.getById", "companyId", ["1", "2", "3"], max_batch_size=2
+            )
         )
         self.assertEqual([r["id"] for r in results], ["1", "2", "3"])
         self.assertEqual(http.post_batch.call_count, 2)

@@ -8,11 +8,13 @@ from .common import WareraModel
 
 
 class CompanyDates(WareraModel):
-    pass
+    last_hires_at: list[str] | None = Field(default=None, alias="lastHiresAt")
 
 
 class CompanyActiveUpgradeLevels(WareraModel):
-    pass
+    automated_engine: int | None = Field(default=None, alias="automatedEngine")
+    break_room: int | None = Field(default=None, alias="breakRoom")
+    storage: int | None = Field(default=None, alias="storage")
 
 
 class Company(WareraModel):

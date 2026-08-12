@@ -33,3 +33,13 @@ class RankingResource(BaseResource):
         else:
             items = []
         return [RankingEntry.model_validate(r) for r in items]
+
+    async def get_ranking(
+        self, ranking_type: str, country_id: str | None = None
+    ) -> list[RankingEntry]:
+        """Get ranking."""
+        params = {"type": ranking_type}
+        if country_id:
+            params["countryId"] = country_id
+        res = await self._http.get("ranking.getRanking", params)
+        return [RankingEntry.parse_obj(r) for r in res]

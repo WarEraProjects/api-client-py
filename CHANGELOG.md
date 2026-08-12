@@ -1,15 +1,30 @@
 # Changelog
 
-
-## [0.2.3] — 2026-08-10
+## [0.2.4] — 2026-08-12
 
 ### Bug Fixes
+- **`war.getById` Schema & Parameter Fix:** The `WarResource` was completely broken: it was incorrectly passing `id` instead of `warId` to the API, and the Pydantic model (`War`) was missing all its nested fields (`attacker`, `defender`, `is_active`, etc.). It has been rewritten to perfectly match the live API's payload structure and successfully parses all objects.
 - **`company.getCompanies` ID dropping:** The API returns a page of company ID strings, but `CursorPage.from_raw(..., Company)` discarded every non-dict item, so `get_companies` / `get_by_user` / `collect_by_users` always looked empty. `get_companies` (and `collect_all`) now return those IDs; `get_by_user` and `collect_by_users` hydrate them into full `Company` objects via `get_many`.
 - **`worker.getWorkers` empty list:** The API returns `{type, workers: [...]}`, but the client only read `items`/`data`, so `get_workers()` always returned `[]`. It now reads `workers` (with `items`/`data` fallbacks) and maps `user`/`company`/`wage`/`joinedAt` onto the `Worker` model.
 
 ### Documentation
-- Replaced the GitHub Wiki generator with an MkDocs Material site (`docs/`, `mkdocs.yml`) and a GitHub Pages deploy workflow.
-- README now links to the published API Reference instead of the old wiki.
+- Added MkDocs-based documentation site with GitHub Pages deployment.
+
+### 🛑 Request Cancellation (AbortController)
+Added the highly requested ability to cancel in-flight API requests, inspired by Issue #30 in the TS wrapper.
+
+- **`CancellationScope` Context Manager:** Seamlessly wrap API calls in an `async with CancellationScope() as scope:` block. Calling `scope.cancel()` will instantly abort any pending tasks within that scope, throwing an `asyncio.CancelledError`.
+- **Pre-flight Batch Pruning:** Cancelled requests are caught *before* they are bundled into network calls by the auto-batching engine. If a user cancels a request while it's still waiting in the 5ms batch queue, it is silently removed, saving bandwidth and rate-limit points.
+- **Sync Shim Support:** Cancellation safely traverses the sync/async bridge! The `warera.sync.CancellationScope` can be invoked from any thread, and accurately propagates the signal down to the isolated asyncio daemon thread.
+
+### 💾 Persistent SWR Caching & Data Backends
+- **SQLite Support:** Replaced the hardcoded in-memory SWR cache with a pluggable `CacheBackend` interface (`warera.cache_backends`). You can now initialize the client with `SQLiteCacheBackend("cache.db")` to persist API responses across application restarts!
+
+### 📡 Network Telemetry & HTTP Context
+- **Telemetry Hooks:** Added a `TelemetryHooks` API. You can pass custom hooks during client initialization to receive granular event metrics like `on_cache_hit(key, is_stale)`.
+- **`.env` Auto-loading:** The `HttpSession` explicitly respects `os.environ.get("WARERA_API_KEY")` during instantiation, automatically injecting it into the `x-api-key` header for security.
+- **Header Customization:** Fixed the `user-agent` header to correctly broadcast `warera-client` across all network layers, and securely hashes the base36 `rt` retry header for rate-limit transparency.
+- **Request Priority Queue:** Internal batching has been split into priority lanes to ensure `HIGH` priority commands jump the queue.
 
 ## [0.2.2] — 2026-06-26
 
@@ -153,7 +168,7 @@ Every public endpoint was validated field-by-field against live production paylo
 - **HTTP Retry Engine**: Natively implements the TypeScript wrapper's `createRetryFetch` engine. Automatically intercepts HTTP errors (`408, 409, 425, 429, 500, 502, 503, 504`) and transient network issues with configurable exponential backoff and uniform random jitter to prevent thundering herd bottlenecks.
 - **Strict GameConfig Typing**: Over 75+ nested structures inside `gameConfig.getGameConfig` have been strictly typed (e.g. `GameConfigBadges`, `UpgradeConfigBunkerLevel`). The Pydantic schemas were machine-generated directly from the official TS AST to provide absolute 100% architectural schema parity, dropping the unsafe `dict[str, Any]` typings entirely.
 
-For full details on migrating your code from `v0.1.x`, see the [v0.2.0 Migration Guide](MIGRATION-0.2.0.md).
+For full details on migrating your code from `v0.1.x`, see the [v0.2.0 Migration Guide](https://github.com/wareraprojects/api-client-py/wiki/Migration-Guide).
 
 ## [0.1.9] — 2026-05-26
 

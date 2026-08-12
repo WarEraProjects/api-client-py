@@ -7,8 +7,6 @@
 
 > A robust, fully-typed, async-first Python client for the [WarEra](https://warera.io) tRPC API (v0.25.0-beta).
 > 
-> **⚠️ Upgrading from v0.1.x?** Please read the [v0.2.0 Migration Guide](MIGRATION-0.2.0.md).
-> 
 ```python
 import warera
 
@@ -119,7 +117,7 @@ async with WareraClient(api_key="YOUR_KEY") as client:
 
 ## All Resource Methods
 
-For a complete, detailed list of all 32 resource namespaces, their signatures, and the returned Pydantic models, please refer to the **[API Reference](https://warera-india.github.io/api-client-py/reference/)**.
+For a complete, detailed list of all 32 resource namespaces, their signatures, and the returned Pydantic models, please refer to the **[API Reference Documentation](https://wareraprojects.github.io/api-client-py/reference/)**.
 
 ---
 
@@ -214,6 +212,57 @@ X-API-Key: <token>
 
 ---
 
+## Request Cancellation (AbortController)
+
+If you trigger a massive `collect_all()` task but the user closes their browser or navigates away, you don't want the SDK to keep burning API rate limits on background requests. You can gracefully abort operations using a `CancellationScope`.
+
+```python
+from warera import CancellationScope
+
+async def fetch_data(scope: CancellationScope):
+    try:
+        async with scope:
+            # If scope.cancel() is called elsewhere, this instantly raises asyncio.CancelledError
+            # Any HTTP request waiting in the 5ms batch queue is silently pruned before hitting the network!
+            data = await client.user.collect_all()
+    except asyncio.CancelledError:
+        print("Operation was gracefully cancelled!")
+
+# Elsewhere in your application:
+# scope.cancel()
+```
+
+---
+
+## Persistent SWR Caching
+
+By default, the SDK uses an in-memory true-LRU `OrderedDict` to cache static endpoints like `gameConfig` using Stale-While-Revalidate semantics.
+
+To persist this data across bot restarts or server crashes, you can configure the client to use the `SQLiteCacheBackend`.
+
+```python
+from warera.cache_backends import SQLiteCacheBackend
+
+# Creates or connects to cache.db in the current directory
+client = WareraClient(cache_backend=SQLiteCacheBackend("cache.db"))
+```
+
+---
+
+## Request Priority
+
+In complex applications, you may have background workers fetching millions of records while a user clicks a button that needs an instant response. To prevent the user's request from getting stuck behind 10,000 background jobs in the auto-batching queue, use `RequestPriority.HIGH`.
+
+```python
+from warera import RequestPriority
+
+# This request jumps to the very front of the internal batching queue
+# and will be dispatched in the next immediate physical HTTP POST (≤ 5ms)
+critical_user = await client.user.get_by_id("123", priority=RequestPriority.HIGH)
+```
+
+---
+
 ## Error Handling
 
 ```python
@@ -300,7 +349,7 @@ warera/
 ## Development
 
 ```bash
-git clone https://github.com/warera-india/api-client-py
+git clone https://github.com/wareraprojects/api-client-py
 cd api-client-py
 pip install -e ".[dev]"
 
@@ -325,7 +374,4 @@ MIT
 
 ## Credits
 
-- **Bipin Krishnan (`bipinkrish` / `Bipin`)**: Initial architecture, core client implementation, rate-limiting foundations, and testing frameworks.
-- **PAIN (`PAIN「ᴀᴋᴀᴛsᴜᴋɪ」` / `CrucifiedPain`)**: Comprehensive expansion of Pydantic schemas, API parity updates, documentation overhauls, and feature additions.
-- **[WarEraProjects](https://github.com/wareraprojects)**: Massive credit to the official TypeScript Wrapper (`@wareraprojects/api`) team for providing the foundational schemas and reverse-engineering the underlying tRPC batching protocols.
-- **[Kore-rep](https://github.com/Kore-rep)**: Suggested the implementation of the adaptive rate-limiting engine.
+- **[WarEraProjects](https://github.com/wareraprojects)**: Massive credit to WarEraProjects team as well as all other contributors for the [TypeScript Wrapper](https://github.com/wareraprojects/trpc) which gave a foundational reference to work with on bringing the wrapper features into python.

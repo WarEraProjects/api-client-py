@@ -37,3 +37,8 @@ class RegionResource(BaseResource):
         futs = [self.get(rid) for rid in region_ids]
         results = await asyncio.gather(*futs, return_exceptions=True)
         return [r if not isinstance(r, BaseException) else None for r in results]
+
+    async def get_all_list(self) -> list[Region]:
+        """Get all regions as a list."""
+        res = await self._get("region.getAll")
+        return [Region.model_validate(r) for r in res]

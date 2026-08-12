@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import asyncio
 import atexit
+import concurrent.futures
+import contextvars
 import functools
 import inspect
 import queue
@@ -33,6 +35,7 @@ from collections.abc import Iterator
 from typing import Any, cast
 
 from ._batch import BatchSession
+from ._cancellation import CancellationScope
 from .client import WareraClient as _AsyncClient
 
 # ---------------------------------------------------------------------------
@@ -72,13 +75,38 @@ def shutdown() -> None:
         _bg_loop = None
         _bg_thread = None
 
+
 atexit.register(shutdown)
 
 
 def _run(coro: Any) -> Any:
     """Run a coroutine synchronously on the background event loop."""
     loop = _ensure_loop()
-    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    ctx = contextvars.copy_context()
+
+    future: concurrent.futures.Future[Any] = concurrent.futures.Future()
+
+    def callback() -> None:
+        try:
+            task = loop.create_task(coro)
+
+            def _on_done(t: asyncio.Task[Any]) -> None:
+                if t.cancelled():
+                    future.cancel()
+                elif t.exception() is not None:
+                    import typing
+
+                    exc = t.exception()
+                    future.set_exception(typing.cast(Exception, exc) if exc else Exception())
+                else:
+                    future.set_result(t.result())
+
+            task.add_done_callback(_on_done)
+        except BaseException as exc:
+            if future.set_running_or_notify_cancel():
+                future.set_exception(exc)
+
+    loop.call_soon_threadsafe(callback, context=ctx)
     return future.result()
 
 
@@ -111,7 +139,15 @@ def _run_async_gen(async_gen: Any) -> Iterator[Any]:
         finally:
             q.put(_sentinel)
 
-    task = asyncio.run_coroutine_threadsafe(_producer(), loop)
+    task_future: concurrent.futures.Future[asyncio.Task[None]] = concurrent.futures.Future()
+    ctx = contextvars.copy_context()
+
+    def _create() -> None:
+        t = loop.create_task(_producer())
+        task_future.set_result(t)
+
+    loop.call_soon_threadsafe(_create, context=ctx)
+    task = task_future.result()
 
     try:
         while True:
@@ -223,10 +259,6 @@ class WareraClient:
     def __init__(self, api_key: str | None = None, **kwargs: Any) -> None:
         self._async_client = _AsyncClient(api_key=api_key, **kwargs)
         _run(self._async_client._http.__aenter__())
-    def __del__(self) -> None:
-        import contextlib
-        with contextlib.suppress(Exception):
-            self.close()
 
         # Wrap every resource namespace
         self.alliance = _wrap_resource(self._async_client.alliance)
@@ -265,9 +297,9 @@ class WareraClient:
         self.tournament = _wrap_resource(self._async_client.tournament)
 
     def batch(
-        self, batch_size: int | None = None, concurrency: int | None = None
+        self, max_batch_size: int | None = None, concurrency: int | None = None
     ) -> _SyncBatchSession:
-        return _SyncBatchSession(self._async_client.batch(batch_size, concurrency))
+        return _SyncBatchSession(self._async_client.batch(max_batch_size, concurrency))
 
     @property
     def has_api_key(self) -> bool:
@@ -282,7 +314,14 @@ class WareraClient:
         return cast(bool, _run(self._async_client.validate_api_key()))
 
     def close(self) -> None:
+        """Close the underlying client and release thread resources."""
         _run(self._async_client.aclose())
+
+    def __del__(self) -> None:
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            self.close()
 
     def __enter__(self) -> WareraClient:
         return self
@@ -370,3 +409,12 @@ def __getattr__(name: str) -> Any:
     if name in _RESOURCE_NAMES:
         return getattr(get_client(), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    "WareraClient",
+    "CancellationScope",
+    "set_api_key",
+    "validate_api_key",
+    "get_client",
+]

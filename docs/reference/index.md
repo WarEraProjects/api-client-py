@@ -31,6 +31,7 @@ Below is a list of all available resource namespaces on the `WareraClient`:
 - [`client.transaction`](resource-transaction.md) - TransactionResource
 - [`client.upgrade`](resource-upgrade.md) - UpgradeResource
 - [`client.user`](resource-user.md) - UserResource
+- [`client.war`](resource-war.md) - WarResource
 - [`client.work`](resource-work.md) - WorkResource
 - [`client.work_offer`](resource-work_offer.md) - WorkOfferResource
 - [`client.worker`](resource-worker.md) - WorkerResource

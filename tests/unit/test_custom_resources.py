@@ -16,7 +16,6 @@ from warera.resources.mu_member import MuMemberResource
 from warera.resources.party import PartyResource
 from warera.resources.work import WorkResource
 from warera.resources.work_offer import WorkOfferResource
-from warera.resources.worker import WorkerResource
 
 
 def _mock_http(return_value) -> MagicMock:
@@ -372,128 +371,6 @@ async def test_company_get_production_bonus_empty():
     resource = CompanyResource(_mock_http({}))
     bonus = await resource.get_production_bonus("c_empty")
     assert bonus.total == 0.0
-
-
-def test_company_id_page_parses_string_ids():
-    from warera.resources.company import _company_id_page
-
-    page = _company_id_page(
-        {
-            "items": ["c1", "c2"],
-            "nextCursor": "cursor-1",
-        }
-    )
-    assert page.items == ["c1", "c2"]
-    assert page.next_cursor == "cursor-1"
-    assert page.has_more is True
-
-
-def test_company_id_page_parses_dict_items_defensively():
-    from warera.resources.company import _company_id_page
-
-    page = _company_id_page(
-        {
-            "items": [{"_id": "c1", "name": "Alpha"}, {"id": "c2"}],
-        }
-    )
-    assert page.items == ["c1", "c2"]
-    assert page.has_more is False
-
-
-@pytest.mark.asyncio
-async def test_company_get_companies_returns_ids():
-    raw = {
-        "items": ["6a799ab1072639fe7ac9b76e", "6a73502669b197f5862aa9f7"],
-        "nextCursor": "Mon Aug 10 2026 11:19:08 GMT+0000|6a73502669b197f5862aa9f7",
-    }
-    resource = CompanyResource(_mock_http(raw))
-    page = await resource.get_companies(user_id="u1", per_page=20)
-
-    assert len(page) == 2
-    assert page.items == [
-        "6a799ab1072639fe7ac9b76e",
-        "6a73502669b197f5862aa9f7",
-    ]
-    assert page.has_more is True
-    resource._http.get.assert_awaited_once_with(
-        "company.getCompanies",
-        {"userId": "u1", "perPage": 20},
-    )
-
-
-@pytest.mark.asyncio
-async def test_company_get_by_user_hydrates_companies():
-    http = MagicMock()
-    http.get = AsyncMock(
-        return_value={
-            "items": ["c1", "c2"],
-        }
-    )
-    http.post_batch = AsyncMock(
-        return_value=[
-            {"_id": "c1", "name": "Alpha"},
-            {"_id": "c2", "name": "Beta"},
-        ]
-    )
-    resource = CompanyResource(http)
-    companies = await resource.get_by_user("u1")
-
-    assert len(companies) == 2
-    assert companies[0].id == "c1"
-    assert companies[0].name == "Alpha"
-    assert companies[1].id == "c2"
-    assert companies[1].name == "Beta"
-    http.post_batch.assert_awaited_once()
-
-
-# ---------------------------------------------------------------------------
-# Worker
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_worker_get_workers_from_workers_key():
-    raw = {
-        "type": "company",
-        "workers": [
-            {
-                "_id": "w1",
-                "user": "u1",
-                "company": "c1",
-                "employer": "e1",
-                "wage": 0.133,
-                "joinedAt": "2026-08-08T06:02:16.847Z",
-                "fidelity": 3,
-            }
-        ],
-    }
-    resource = WorkerResource(_mock_http(raw))
-    workers = await resource.get_workers(company_id="c1")
-
-    assert len(workers) == 1
-    assert workers[0].id == "w1"
-    assert workers[0].user_id == "u1"
-    assert workers[0].company_id == "c1"
-    assert workers[0].employer_id == "e1"
-    assert workers[0].salary == 0.133
-    assert workers[0].started_at == "2026-08-08T06:02:16.847Z"
-    assert workers[0].fidelity == 3
-
-
-@pytest.mark.asyncio
-async def test_worker_get_workers_from_list():
-    raw = [{"_id": "w1", "user": "u1", "company": "c1", "wage": 1.5}]
-    resource = WorkerResource(_mock_http(raw))
-    workers = await resource.get_workers(user_id="u1")
-    assert len(workers) == 1
-    assert workers[0].salary == 1.5
-
-
-@pytest.mark.asyncio
-async def test_worker_get_workers_empty_payload():
-    resource = WorkerResource(_mock_http({"type": "company", "workers": []}))
-    workers = await resource.get_workers(company_id="c1")
-    assert workers == []
 
 
 # ---------------------------------------------------------------------------

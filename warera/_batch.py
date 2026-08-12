@@ -95,17 +95,17 @@ class BatchSession:
 
         # After the block: item1.result, item2.result are populated.
 
-    If batch_size < number of queued calls, they are split into multiple
+    If max_batch_size < number of queued calls, they are split into multiple
     concurrent POST requests automatically.
     """
 
     def __init__(
-        self, http: Any, batch_size: int = DEFAULT_BATCH_SIZE, concurrency: int | None = None
+        self, http: Any, max_batch_size: int = DEFAULT_BATCH_SIZE, concurrency: int | None = None
     ) -> None:
         # `http` is an HttpSession instance — typed as Any to avoid circular import
         self._http = http
         # Clamp to the API hard limit — requests with >50 procedures are rejected.
-        self._batch_size = min(batch_size, MAX_BATCH_SIZE)
+        self._max_batch_size = min(max_batch_size, MAX_BATCH_SIZE)
         self._concurrency = concurrency
         self._queue: list[BatchItem[Any]] = []
 
@@ -126,7 +126,7 @@ class BatchSession:
 
     async def flush(self) -> None:
         """
-        Execute all queued calls. Splits into chunks of `batch_size` and
+        Execute all queued calls. Splits into chunks of `max_batch_size` and
         fires chunks concurrently. Called automatically on `__aexit__`.
         """
         if not self._queue:
@@ -134,8 +134,8 @@ class BatchSession:
 
         # Split queue into chunks
         chunks: list[list[BatchItem[Any]]] = [
-            self._queue[i : i + self._batch_size]
-            for i in range(0, len(self._queue), self._batch_size)
+            self._queue[i : i + self._max_batch_size]
+            for i in range(0, len(self._queue), self._max_batch_size)
         ]
 
         # Fire all chunks concurrently with limits if specified
@@ -194,7 +194,7 @@ async def fetch_many_by_ids(
     procedure: str,
     id_param: str,
     ids: list[str],
-    batch_size: int = DEFAULT_BATCH_SIZE,
+    max_batch_size: int = DEFAULT_BATCH_SIZE,
     concurrency: int | None = None,
 ) -> list[Any]:
     """
@@ -206,7 +206,7 @@ async def fetch_many_by_ids(
         procedure:  e.g. "company.getById"
         id_param:   The input key name, e.g. "companyId"
         ids:        List of ID strings to fetch
-        batch_size: Max IDs per batch POST (default 50, hard-capped at 50)
+        max_batch_size: Max IDs per batch POST (default 50, hard-capped at 50)
 
     Returns:
         List of raw API responses in the same order as `ids`. Entries for
@@ -217,7 +217,7 @@ async def fetch_many_by_ids(
         return []
 
     # Enforce the server hard limit regardless of what the caller passed.
-    effective_size = min(batch_size, MAX_BATCH_SIZE)
+    effective_size = min(max_batch_size, MAX_BATCH_SIZE)
     chunks = [ids[i : i + effective_size] for i in range(0, len(ids), effective_size)]
 
     sem = asyncio.Semaphore(concurrency) if concurrency is not None else None

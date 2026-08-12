@@ -138,3 +138,22 @@ async def test_get_many_countries_batch(client):
 
     for item in items:
         assert item.ok
+
+
+async def test_war_get_live(client) -> None:
+    """Verify we can fetch a war from a live battle."""
+    import pytest
+    page = await client.battle.get_many(is_active=True, limit=1)
+    if not page.items:
+        pytest.skip("No active battles to get a war ID from")
+    war_id = page.items[0].war_id
+    if not war_id:
+        pytest.skip("Active battle has no associated war_id")
+
+    # Fetch the war
+    war = await client.war.get(war_id)
+    assert war.id == war_id
+    assert war.attacker is not None
+    assert war.attacker.country_id is not None
+    assert war.defender is not None
+    assert war.defender.country_id is not None

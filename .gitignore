@@ -8,5 +8,10 @@ build/
 warera_client.egg-info/
 .mypy_cache
 dist/
+
+# Agent and temporary files
+.agents/
+openapi.json
+
 site/
-docs/reference/resource-*.md
+docs/reference/resource-*.md

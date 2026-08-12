@@ -28,6 +28,7 @@ from typing import Any
 
 from ._batch import MAX_BATCH_SIZE, BatchSession
 from ._http import DEFAULT_BASE_URL, HttpSession, OnRetryCallback
+from .cache_backends import CacheBackend
 from .resources.action_log import ActionLogResource
 from .resources.alliance import AllianceResource
 from .resources.article import ArticleResource
@@ -57,9 +58,11 @@ from .resources.tournament import TournamentResource
 from .resources.transaction import TransactionResource
 from .resources.upgrade import UpgradeResource
 from .resources.user import UserResource
+from .resources.war import WarResource
 from .resources.work import WorkResource
 from .resources.work_offer import WorkOfferResource
 from .resources.worker import WorkerResource
+from .telemetry import TelemetryHooks
 
 
 class WareraClient:
@@ -104,6 +107,7 @@ class WareraClient:
         client.mercenary_contract_auction → MercenaryContractAuctionResource
         client.tournament    → TournamentResource
         client.alliance      → AllianceResource
+        client.war           → WarResource
     """
 
     def __init__(
@@ -118,12 +122,14 @@ class WareraClient:
         backoff_multiplier: float = 2.0,
         jitter: bool = True,
         retryable_status_codes: set[int] | list[int] | tuple[int, ...] | None = None,
-        batch_size: int = 50,
+        max_batch_size: int = 50,
         concurrency: int | None = None,
         auto_batch_delay: float = 0.005,
         event_hooks: dict[str, list[Any]] | None = None,
         headers: dict[str, str] | None = None,
         on_retry: OnRetryCallback | None = None,
+        cache_backend: CacheBackend | None = None,
+        telemetry: TelemetryHooks | None = None,
     ) -> None:
         """
         Args:
@@ -138,7 +144,7 @@ class WareraClient:
             backoff_multiplier:   Multiplier for exponential backoff (default: 2.0).
             jitter:               Whether to add random jitter to retry delays (default: True).
             retryable_status_codes: Custom set of HTTP status codes to retry on (default: 408, 409, 425, 429, 50x).
-            batch_size:           Default max procedures per batch POST.
+            max_batch_size:       Default max procedures per batch POST.
             concurrency:          Default max concurrent chunk POSTs per batch flush.
             auto_batch_delay:     Wait time (in seconds) to accumulate concurrent requests
                                   before flushing the batch (aligns with tRPC httpBatchLink).
@@ -149,6 +155,8 @@ class WareraClient:
                                   :class:`warera.RetryInfo` (attempt, delay_s, error,
                                   status_code) — mirrors the TS wrapper's ``onRetry``.
                                   Exceptions raised by the callback are logged and ignored.
+            cache_backend:        An optional CacheBackend instance to back the SWR Cache.
+                                  Defaults to an in-memory dictionary.
         """
         self._http = HttpSession(
             api_key=api_key,
@@ -164,9 +172,12 @@ class WareraClient:
             event_hooks=event_hooks,
             headers=headers,
             on_retry=on_retry,
+            cache_backend=cache_backend,
+            telemetry=telemetry,
+            max_batch_size=min(max_batch_size, MAX_BATCH_SIZE),
         )
         # Clamp to server hard limit — the API rejects batches > 50 procedures.
-        self._batch_size = min(batch_size, MAX_BATCH_SIZE)
+        self._max_batch_size = min(max_batch_size, MAX_BATCH_SIZE)
         self._concurrency = concurrency
 
         # --- Resource namespaces ---
@@ -202,6 +213,7 @@ class WareraClient:
         self.inventory = InventoryResource(self._http)
         self.action_log = ActionLogResource(self._http)
         self.tournament = TournamentResource(self._http)
+        self.war = WarResource(self._http)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -302,7 +314,9 @@ class WareraClient:
     # Batch
     # ------------------------------------------------------------------
 
-    def batch(self, batch_size: int | None = None, concurrency: int | None = None) -> BatchSession:
+    def batch(
+        self, max_batch_size: int | None = None, concurrency: int | None = None
+    ) -> BatchSession:
         """
         Create a BatchSession for sending multiple procedures in one HTTP round-trip.
 
@@ -315,13 +329,15 @@ class WareraClient:
             print(item_b.result)
 
         Args:
-            batch_size: Override the client's default batch chunk size.
+            max_batch_size: Override the client's default batch chunk size.
             concurrency: Override the client's default concurrency limit.
         """
         return BatchSession(
             http=self._http,
             # BatchSession will also clamp; being explicit here is good for clarity.
-            batch_size=min(batch_size, MAX_BATCH_SIZE) if batch_size else self._batch_size,
+            max_batch_size=min(max_batch_size, MAX_BATCH_SIZE)
+            if max_batch_size
+            else self._max_batch_size,
             concurrency=concurrency if concurrency is not None else self._concurrency,
         )
 

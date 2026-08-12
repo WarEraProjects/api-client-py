@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from ..models.country import Country
 from ._base import BaseResource
-
-if TYPE_CHECKING:
-    pass
 
 
 class CountryResource(BaseResource):

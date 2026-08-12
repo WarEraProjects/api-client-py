@@ -34,3 +34,8 @@ class TournamentResource(BaseResource):
         if isinstance(raw, list):
             return [TournamentTeam.model_validate(item) for item in raw]
         return []
+
+    async def get_by_id(self, tournament_id: str) -> Tournament:
+        """Get tournament by ID."""
+        res = await self._get("tournament.getById", id=tournament_id)
+        return Tournament.model_validate(res)
