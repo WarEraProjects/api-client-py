@@ -29,7 +29,7 @@ class WorkerResource(BaseResource):
         if isinstance(raw, list):
             return [Worker.model_validate(w) for w in raw if isinstance(w, dict)]
         if isinstance(raw, dict):
-            # Live API returns ``{type, workers: [...]}``; keep items/data as fallbacks.
+            # Live API returns ``{type, workers: [...]}``;  keep items/data as fallbacks.
             candidate = raw.get("workers", raw.get("items", raw.get("data", [])))
             items = candidate if isinstance(candidate, list) else []
         else:

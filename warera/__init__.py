@@ -20,6 +20,7 @@ Sync:
 
 import typing
 
+from ._cancellation import CancellationScope
 from ._enums import (
     ActionLogActionType,
     ArticleType,
@@ -32,10 +33,12 @@ from ._enums import (
     EventType,
     MercenaryAuctionStatus,
     RankingType,
+    RequestPriority,
     TransactionType,
     UpgradeType,
 )
 from ._http import RetryInfo
+from .cache_backends import CacheBackend, MemoryCacheBackend, SQLiteCacheBackend
 from .client import WareraClient
 from .exceptions import (
     WareraBatchError,
@@ -56,7 +59,6 @@ from .models import (
     AllianceRankings,
     Article,
     ArticleLite,
-    Battle,
     BattleLive,
     BattleLootPoolItem,
     BattleLootSummary,
@@ -119,12 +121,14 @@ from .models import (
     UserRankings,
     UserSkills,
     UserStats,
+    War,
     WareraModel,
     Worker,
     WorkerCount,
     WorkOffer,
     WorkStats,
 )
+from .telemetry import TelemetryHooks
 
 if typing.TYPE_CHECKING:
     from .resources.action_log import ActionLogResource
@@ -156,6 +160,7 @@ if typing.TYPE_CHECKING:
     from .resources.transaction import TransactionResource
     from .resources.upgrade import UpgradeResource
     from .resources.user import UserResource
+    from .resources.war import WarResource
     from .resources.work import WorkResource
     from .resources.work_offer import WorkOfferResource
     from .resources.worker import WorkerResource
@@ -192,6 +197,7 @@ if typing.TYPE_CHECKING:
     work: WorkResource
     work_offer: WorkOfferResource
     worker: WorkerResource
+    war: WarResource
 
 
 _default_client: WareraClient | None = None
@@ -261,6 +267,7 @@ _RESOURCE_NAMES = {
     "work",
     "work_offer",
     "worker",
+    "war",
 }
 
 
@@ -270,15 +277,22 @@ def __getattr__(name: str) -> typing.Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 __all__ = [
     # Client
     "WareraClient",
+    "CancellationScope",
     "set_api_key",
     "get_client",
     "validate_api_key",
     "RetryInfo",
+    # Cache
+    "CacheBackend",
+    "MemoryCacheBackend",
+    "SQLiteCacheBackend",
+    # Telemetry
+    "TelemetryHooks",
     # Exceptions
     "WareraError",
     "WareraHTTPError",
@@ -303,6 +317,7 @@ __all__ = [
     "RankingType",
     "TransactionType",
     "UpgradeType",
+    "RequestPriority",
     # Models
     "ActionLog",
     "Alliance",
@@ -379,4 +394,5 @@ __all__ = [
     "WorkStats",
     "Worker",
     "WorkerCount",
+    "War",
 ]

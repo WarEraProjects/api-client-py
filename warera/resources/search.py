@@ -46,3 +46,13 @@ class SearchResource(BaseResource):
                         )
 
         return SearchResults(results=results, total=len(results))
+
+    async def search_mus(self, query: str) -> list[SearchResult]:
+        """Search military units."""
+        res = await self._http.get("search.searchMus", {"query": query})
+        return [SearchResult.parse_obj(r) for r in res]
+
+    async def search_users(self, query: str) -> list[SearchResult]:
+        """Search users."""
+        res = await self._http.get("search.searchUsers", {"query": query})
+        return [SearchResult.parse_obj(r) for r in res]

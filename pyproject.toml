@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "warera-client"
-version = "0.2.3"
+version = "0.2.4"
 description = "A robust Python client for the WarEra tRPC API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,9 +35,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/warera-india/api-client-py"
-Repository = "https://github.com/warera-india/api-client-py"
-Issues = "https://github.com/warera-india/api-client-py/issues"
+Homepage = "https://github.com/wareraprojects/api-client-py"
+Repository = "https://github.com/wareraprojects/api-client-py"
+Issues = "https://github.com/wareraprojects/api-client-py/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -48,6 +48,7 @@ dev = [
     "mypy>=1.10",
     "hatch",
 ]
+
 docs = [
     "mkdocs-material",
 ]
@@ -67,10 +68,10 @@ ignore = ["E501"]
 python_version = "3.10"
 strict = true
 ignore_missing_imports = true
-exclude = ["build/", "dist/", "venv/"]
+exclude = ["build/", "dist/", "venv/", ".venv/"]
 
 [[tool.mypy.overrides]]
-module = ["tests.*", "examples.*"]
+module = ["tests.*", "tests", "examples.*", "examples", "scripts.*", "scripts"]
 check_untyped_defs = false
 disallow_untyped_defs = false
 disallow_untyped_calls = false

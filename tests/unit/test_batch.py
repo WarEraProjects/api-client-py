@@ -64,7 +64,7 @@ async def test_batch_session_empty_does_not_call_http() -> None:
 @pytest.mark.asyncio
 async def test_batch_session_splits_into_chunks() -> None:
     """When queue exceeds batch_size, multiple POST calls are made."""
-    # 3 items with batch_size=2 → 2 POST requests
+    # 3 items with max_batch_size=2 → 2 POST requests
     http = MagicMock()
     http.post_batch = AsyncMock(
         side_effect=[
@@ -73,7 +73,7 @@ async def test_batch_session_splits_into_chunks() -> None:
         ]
     )
 
-    async with BatchSession(http, batch_size=2) as batch:
+    async with BatchSession(http, max_batch_size=2) as batch:
         a = batch.add("company.getById", {"companyId": "1"})
         b = batch.add("company.getById", {"companyId": "2"})
         c = batch.add("company.getById", {"companyId": "3"})
@@ -147,7 +147,7 @@ async def test_fetch_many_by_ids_multiple_chunks() -> None:
     )
 
     results = await fetch_many_by_ids(
-        http, "company.getById", "companyId", ["1", "2", "3"], batch_size=2
+        http, "company.getById", "companyId", ["1", "2", "3"], max_batch_size=2
     )
 
     assert [r["id"] for r in results] == ["1", "2", "3"]
@@ -176,15 +176,15 @@ def test_batch_session_clamps_to_max() -> None:
     """BatchSession silently clamps any batch_size > 50 to 50."""
 
     # Even if the caller passes a huge number, the session caps it.
-    session = BatchSession(http=MagicMock(), batch_size=999)
-    assert session._batch_size == MAX_BATCH_SIZE
+    session = BatchSession(http=MagicMock(), max_batch_size=999)
+    assert session._max_batch_size == MAX_BATCH_SIZE
 
 
 def test_batch_session_default_is_50() -> None:
     """Default batch_size should be the server hard limit."""
 
     session = BatchSession(http=MagicMock())
-    assert session._batch_size == MAX_BATCH_SIZE
+    assert session._max_batch_size == MAX_BATCH_SIZE
 
 
 @pytest.mark.asyncio
@@ -203,7 +203,7 @@ async def test_batch_session_splits_large_queue() -> None:
     http = MagicMock()
     http.post_batch = mock_post_batch
 
-    session = BatchSession(http=http, batch_size=MAX_BATCH_SIZE)
+    session = BatchSession(http=http, max_batch_size=MAX_BATCH_SIZE)
     for i in range(120):
         session.add("test.proc", {"id": str(i)})
 

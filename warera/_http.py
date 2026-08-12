@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import contextvars
 import json
 import logging
 import os
@@ -45,7 +46,9 @@ from tenacity import (
     wait_random_exponential,
 )
 
+from ._enums import RequestPriority
 from ._swr import SWRCache
+from .cache_backends import CacheBackend
 from .exceptions import (
     WareraBatchError,
     WareraError,
@@ -54,6 +57,7 @@ from .exceptions import (
     WareraValidationError,
     _raise_for_status,
 )
+from .telemetry import TelemetryHooks
 
 logger = logging.getLogger("warera.http")
 
@@ -129,7 +133,7 @@ class _RateLimitState:
     callers can inspect total usage for the session's lifetime.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, telemetry: TelemetryHooks | None = None) -> None:
         self.limit: int | None = None
         self.remaining: int | None = None
         # Absolute monotonic time (seconds) when the window resets.
@@ -148,6 +152,7 @@ class _RateLimitState:
         # detected from headers), we finalize the previous window's consumption.
         self._prev_remaining: int | None = None
         self._prev_limit: int | None = None
+        self._telemetry = telemetry
 
     def ensure_lock(self) -> None:
         """Create the asyncio.Lock if it does not yet exist.
@@ -231,6 +236,8 @@ class _RateLimitState:
                 if wait_secs > 0:
                     jitter = random.uniform(0.01, 0.5)
                     self.total_wait_seconds += wait_secs + jitter
+                    if self._telemetry:
+                        self._telemetry.on_rate_limit_sleep(wait_secs + jitter)
                     logger.warning(
                         f"Rate limit exhausted. Sleeping for {wait_secs:.2f}s + {jitter:.2f}s jitter..."
                     )
@@ -264,6 +271,9 @@ class HttpSession:
         headers: dict[str, str] | None = None,
         retryable_status_codes: set[int] | list[int] | tuple[int, ...] | None = None,
         on_retry: OnRetryCallback | None = None,
+        cache_backend: CacheBackend | None = None,
+        telemetry: TelemetryHooks | None = None,
+        max_batch_size: int = 50,
     ) -> None:
         # Resolve API key: explicit arg > env var > None
         self._api_key: str | None = api_key or os.environ.get(_ENV_KEY)
@@ -275,19 +285,24 @@ class HttpSession:
         self._backoff_multiplier = backoff_multiplier
         self._jitter = jitter
         self._client: httpx.AsyncClient | None = None
-        self._rate_limit = _RateLimitState()
-        self._auto_batch_queue: list[tuple[str, dict[str, Any], asyncio.Future[Any]]] = []
+        self._telemetry = telemetry
+        self._rate_limit = _RateLimitState(telemetry=telemetry)
+        self._auto_batch_queue: list[
+            tuple[RequestPriority, str, dict[str, Any], asyncio.Future[Any]]
+        ] = []
         self._auto_batch_task: asyncio.Task[None] | None = None
         self._auto_batch_delay = auto_batch_delay
+        self._auto_batch_flush_event = asyncio.Event()
         self._event_hooks = event_hooks or {}
         self._custom_headers = headers or {}
         self._on_retry = on_retry
-        self._swr_cache = SWRCache()
+        self._swr_cache = SWRCache(backend=cache_backend, telemetry=telemetry)
         self._retryable_status_codes = frozenset(
             retryable_status_codes
             if retryable_status_codes is not None
             else {408, 409, 425, 429, 500, 502, 503, 504}
         )
+        self._max_batch_size = max_batch_size
 
     def _is_retryable(self, exc: BaseException) -> bool:
         """Retry on specific status codes and network errors."""
@@ -391,25 +406,54 @@ class HttpSession:
     # Single call  →  GET /procedure?input=<json>
     # ------------------------------------------------------------------
 
-    async def get(self, procedure: str, params: dict[str, Any]) -> Any:
-        """
-        Execute a single tRPC GET call.
-        Automatically intercepts and bundles concurrent calls into a single batch POST
-        to drastically reduce network overhead and rate limit consumption.
-        """
-        loop = asyncio.get_running_loop()
-        fut = loop.create_future()
-        self._auto_batch_queue.append((procedure, params, fut))
-        logger.debug(
-            f"Queuing '{procedure}' for auto-batching (queue size: {len(self._auto_batch_queue)})"
-        )
+    async def get(
+        self,
+        procedure: str,
+        params: dict[str, Any],
+        priority: RequestPriority | Any = RequestPriority.NORMAL,
+    ) -> Any:
+        from ._cancellation import get_current_scope
 
-        if self._auto_batch_task is None:
-            self._auto_batch_task = loop.create_task(self._auto_batch_flush())
+        scope = get_current_scope()
+        task = asyncio.current_task()
+        if scope and task:
+            scope._register(task)
 
-        return await fut
+        try:
+            await self._ensure_client()
+            loop = asyncio.get_running_loop()
+            fut: asyncio.Future[Any] = loop.create_future()
+            self._auto_batch_queue.append((priority, procedure, params, fut))
 
-    async def get_swr(self, procedure: str, params: dict[str, Any], ttl_seconds: float) -> Any:
+            if self._auto_batch_task is None:
+                import sys
+
+                ctx = contextvars.Context()
+                if sys.version_info >= (3, 11):
+                    self._auto_batch_task = loop.create_task(self._auto_batch_flush(), context=ctx)  # type: ignore[call-arg]
+                else:
+                    self._auto_batch_task = ctx.run(loop.create_task, self._auto_batch_flush())
+
+            if priority == RequestPriority.HIGH:
+                self._auto_batch_flush_event.set()
+
+            try:
+                return await fut
+            except asyncio.CancelledError:
+                if not fut.done():
+                    fut.cancel()
+                raise
+        finally:
+            if scope and task:
+                scope._unregister(task)
+
+    async def get_swr(
+        self,
+        procedure: str,
+        params: dict[str, Any],
+        ttl_seconds: float,
+        priority: RequestPriority | Any = RequestPriority.NORMAL,
+    ) -> Any:
         """
         Execute a GET call wrapped in an SWR cache.
         Returns stale data instantly if available, while fetching fresh data in the background.
@@ -422,61 +466,96 @@ class HttpSession:
             key = json.dumps(key_dict, sort_keys=True)
 
         async def fetcher() -> Any:
-            return await self.get(procedure, params)
+            return await self.get(procedure, params, priority)
 
         return await self._swr_cache.get(key, ttl_seconds, fetcher)
 
     async def _auto_batch_flush(self) -> None:
-        # Wait a brief moment to let other concurrent event-loop tasks queue up.
-        await asyncio.sleep(self._auto_batch_delay)
+        # Wait for the delay, but wake up instantly if a HIGH priority request sets the event.
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(
+                self._auto_batch_flush_event.wait(), timeout=self._auto_batch_delay
+            )
 
         queue = self._auto_batch_queue
         self._auto_batch_queue = []
         self._auto_batch_task = None
+        self._auto_batch_flush_event.clear()
 
-        if not queue:
+        # filter out cancelled futures to avoid sending unnecessary data
+        active_queue = [q for q in queue if not q[3].done()]
+        if not active_queue:
             return
 
-        logger.debug(f"Flushing batch of {len(queue)} procedures...")
+        # Sort by priority: HIGH > NORMAL > LOW
+        priority_map = {RequestPriority.HIGH: 0, RequestPriority.NORMAL: 1, RequestPriority.LOW: 2}
+        active_queue.sort(key=lambda item: priority_map.get(item[0], 1))
 
-        if len(queue) == 1:
-            proc, params, fut = queue[0]
+        start_time = time.time()
+
+        logger.debug(f"Flushing batch of {len(active_queue)} procedures...")
+
+        if len(active_queue) == 1:
+            _, proc, params, fut = active_queue[0]
+
+            task = asyncio.current_task()
+
+            def on_cancel(f: asyncio.Future[Any]) -> None:
+                if f.cancelled() and task and not task.done():
+                    task.cancel()
+
+            fut.add_done_callback(on_cancel)
+
             try:
                 res = await self._real_get(proc, params)
                 if not fut.done():
                     fut.set_result(res)
             except BaseException as e:
                 if not fut.done():
-                    fut.set_exception(e)
-                if isinstance(e, asyncio.CancelledError):
+                    if isinstance(e, asyncio.CancelledError):
+                        fut.cancel()
+                    else:
+                        fut.set_exception(e)
+                if not isinstance(e, Exception) or isinstance(e, asyncio.CancelledError):
                     raise
+            finally:
+                fut.remove_done_callback(on_cancel)
+
+            if self._telemetry:
+                exec_time_ms = (time.time() - start_time) * 1000
+                self._telemetry.on_batch_flush(1, exec_time_ms)
             return
 
-        for start_idx in range(0, len(queue), 50):
-            chunk = queue[start_idx : start_idx + 50]
-            procedures = [q[0] for q in chunk]
-            inputs = [q[1] for q in chunk]
-            futs = [q[2] for q in chunk]
-    
-            try:
-                results = await self.post_batch(procedures, inputs)
-                for fut, res in zip(futs, results, strict=True):
-                    if not fut.done():
-                        fut.set_result(res)
-            except WareraBatchError as exc:
-                for i, fut in enumerate(futs):
-                    if fut.done():
-                        continue
-                    if i in exc.errors:
-                        fut.set_exception(exc.errors[i])
+        procedures = [q[1] for q in active_queue]
+        inputs = [q[2] for q in active_queue]
+        futs = [q[3] for q in active_queue]
+
+        try:
+            results = await self.post_batch(procedures, inputs, max_batch_size=self._max_batch_size)
+            for fut, res in zip(futs, results, strict=True):
+                if not fut.done():
+                    fut.set_result(res)
+        except WareraBatchError as exc:
+            for i, fut in enumerate(futs):
+                if fut.done():
+                    continue
+                if i in exc.errors:
+                    fut.set_exception(exc.errors[i])
+                else:
+                    fut.set_result(exc.results.get(i))
+        except BaseException as e:
+            for fut in futs:
+                if not fut.done():
+                    if isinstance(e, asyncio.CancelledError):
+                        fut.cancel()
                     else:
-                        fut.set_result(exc.results.get(i))
-            except BaseException as e:
-                for fut in futs:
-                    if not fut.done():
                         fut.set_exception(e)
-                if isinstance(e, asyncio.CancelledError):
-                    raise
+            if not isinstance(e, Exception) or isinstance(e, asyncio.CancelledError):
+                raise
+        finally:
+            if self._telemetry:
+                exec_time_ms = (time.time() - start_time) * 1000
+                self._telemetry.on_batch_flush(len(procedures), exec_time_ms)
 
     async def _real_get(self, procedure: str, params: dict[str, Any]) -> Any:
         await self._ensure_client()
@@ -516,59 +595,56 @@ class HttpSession:
         procedures: list[str],
         inputs: list[dict[str, Any]],
         *,
-        chunk_size: int = 50,
+        max_batch_size: int = 50,
     ) -> list[Any]:
-        """
-        Execute one or more tRPC batch POSTs, automatically splitting oversized
-        lists into chunks of at most ``chunk_size`` (hard-capped at 50, the
-        server's enforced limit).
+        from ._cancellation import get_current_scope
 
-        Returns a list of parsed ``result.data`` values in the same order as
-        ``procedures``.  Raises :exc:`WareraBatchError` if any item fails.
+        scope = get_current_scope()
+        task = asyncio.current_task()
+        if scope and task:
+            scope._register(task)
 
-        Args:
-            procedures: Procedure names to call, e.g. ``["company.getById", ...]``.
-            inputs:     Corresponding input dicts, one per procedure.
-            chunk_size: Max procedures per physical HTTP request.  Values above
-                        the server hard limit of 50 are clamped silently.
-        """
-        await self._ensure_client()
+        try:
+            await self._ensure_client()
 
-        if not procedures:
-            return []
+            if not procedures:
+                return []
 
-        # Strip None values from all inputs (consistency with GET requests)
-        clean_inputs = [{k: v for k, v in inp.items() if v is not None} for inp in inputs]
+            # Strip None values from all inputs (consistency with GET requests)
+            clean_inputs = [{k: v for k, v in inp.items() if v is not None} for inp in inputs]
 
-        # Clamp to the server hard limit regardless of what was passed.
-        _MAX_BATCH = 50
-        effective = min(max(1, chunk_size), _MAX_BATCH)
+            # Clamp to the server hard limit regardless of what was passed.
+            _MAX_BATCH = 50
+            effective = min(max(1, max_batch_size), _MAX_BATCH)
 
-        # Fast path: fits in one request.
-        if len(procedures) <= effective:
-            proc_path = ",".join(procedures)
-            url = f"/{proc_path}?batch=1"
-            body = {str(i): inp for i, inp in enumerate(clean_inputs)}
-            raw_list = await self._post_batch_with_retry(url, body)
-            return self._unwrap_batch(raw_list, procedures)
+            # Fast path: fits in one request.
+            if len(procedures) <= effective:
+                proc_path = ",".join(procedures)
+                url = f"/{proc_path}?batch=1"
+                body = {str(i): inp for i, inp in enumerate(clean_inputs)}
+                raw_list = await self._post_batch_with_retry(url, body)
+                return self._unwrap_batch(raw_list, procedures)
 
-        # Slow path: split into chunks and collect results in order.
-        # Chunks are fired concurrently — the header-based rate-limit tracker
-        # will sleep automatically if the window is exhausted mid-flight.
-        chunks: list[tuple[list[str], list[dict[str, Any]]]] = []
-        for start in range(0, len(procedures), effective):
-            end = start + effective
-            chunks.append((procedures[start:end], clean_inputs[start:end]))
+            # Slow path: split into chunks and collect results in order.
+            # Chunks are fired concurrently — the header-based rate-limit tracker
+            # will sleep automatically if the window is exhausted mid-flight.
+            chunks: list[tuple[list[str], list[dict[str, Any]]]] = []
+            for start in range(0, len(procedures), effective):
+                end = start + effective
+                chunks.append((procedures[start:end], clean_inputs[start:end]))
 
-        async def _run_chunk(procs: list[str], inps: list[dict[str, Any]]) -> list[Any]:
-            proc_path = ",".join(procs)
-            url = f"/{proc_path}?batch=1"
-            body = {str(i): inp for i, inp in enumerate(inps)}
-            raw = await self._post_batch_with_retry(url, body)
-            return self._unwrap_batch(raw, procs)
+            async def _run_chunk(procs: list[str], inps: list[dict[str, Any]]) -> list[Any]:
+                proc_path = ",".join(procs)
+                url = f"/{proc_path}?batch=1"
+                body = {str(i): inp for i, inp in enumerate(inps)}
+                raw = await self._post_batch_with_retry(url, body)
+                return self._unwrap_batch(raw, procs)
 
-        chunk_results = await asyncio.gather(*[_run_chunk(p, i) for p, i in chunks])
-        return [item for sublist in chunk_results for item in sublist]
+            chunk_results = await asyncio.gather(*[_run_chunk(p, i) for p, i in chunks])
+            return [item for sublist in chunk_results for item in sublist]
+        finally:
+            if scope and task:
+                scope._unregister(task)
 
     async def _post_batch_with_retry(self, url: str, body: dict[str, Any]) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] | None = None

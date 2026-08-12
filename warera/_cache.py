@@ -41,10 +41,14 @@ def async_memoize(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             result = await func(*args, **kwargs)
             fut.set_result(result)
             return result
-        except Exception as e:
-            fut.set_exception(e)
+        except BaseException as e:
+            if not fut.done():
+                if isinstance(e, asyncio.CancelledError):
+                    fut.cancel()
+                else:
+                    fut.set_exception(e)
             # Remove failed futures so they can be retried
-            del cache[key]
+            cache.pop(key, None)
             raise
 
     return wrapper

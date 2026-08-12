@@ -1,8 +1,8 @@
 site_name: WarEra API Client
-site_description: Type-safe Python SDK for the WarEra Game API
-site_url: https://warera-india.github.io/api-client-py/
-repo_url: https://github.com/warera-india/api-client-py
-repo_name: warera-india/api-client-py
+site_description: Type-safe Python wrapper for the WarEra Game API
+site_url: https://wareraprojects.github.io/api-client-py/
+repo_url: https://github.com/WarEraProjects/api-client-py
+repo_name: WarEraProjects/api-client-py
 
 theme:
   name: material

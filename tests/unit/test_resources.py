@@ -10,6 +10,7 @@ from warera.resources.battle import BattleResource
 from warera.resources.country import CountryResource
 from warera.resources.item_trading import ItemTradingResource
 from warera.resources.user import UserResource
+from warera.resources.war import WarResource
 
 
 def _mock_http(return_value) -> MagicMock:
@@ -202,3 +203,19 @@ async def test_user_get_by_country_cursor_page():
     assert len(page.items) == 2
     assert page.items[0].username == "alice"
     assert page.has_more is False
+
+
+# ---------------------------------------------------------------------------
+# War
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_war_get_parses_model():
+    raw = {"id": "w1", "status": "ACTIVE", "attackerId": "7", "defenderId": "8"}
+    resource = WarResource(_mock_http(raw))
+    war = await resource.get("w1")
+
+    assert war.id == "w1"
+    assert war.status == "ACTIVE"
+    assert war.attacker_id == "7"

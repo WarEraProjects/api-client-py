@@ -19,6 +19,19 @@ else:
             return str(self.value)
 
 
+class RequestPriority(StrEnum):  # type: ignore[misc]
+    """
+    Priority levels for background batch queuing.
+    HIGH tasks are surgically injected into the next physical HTTP chunk.
+    NORMAL tasks wait for the standard 5ms auto-batch window.
+    LOW tasks are accumulated until the chunk fills naturally.
+    """
+
+    HIGH = "high"
+    NORMAL = "normal"
+    LOW = "low"
+
+
 class ArticleType(StrEnum):  # type: ignore[misc]
     DAILY = "daily"
     WEEKLY = "weekly"
@@ -26,6 +39,9 @@ class ArticleType(StrEnum):  # type: ignore[misc]
     MY = "my"
     SUBSCRIPTIONS = "subscriptions"
     LAST = "last"
+    MU = "mu"
+    USER = "user"
+    COUNTRY = "country"
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +147,7 @@ class RankingType(StrEnum):  # type: ignore[misc]
     USER_CASES_OPENED = "userCasesOpened"
     USER_GEMS_PURCHASED = "userGemsPurchased"
     USER_BOUNTY = "userBounty"
+    USER_SKINS_OWNED = "userSkinsOwned"
 
     # Military unit rankings
     MU_WEEKLY_DAMAGES = "muWeeklyDamages"
@@ -232,3 +249,89 @@ class ActionLogActionType(StrEnum):  # type: ignore[misc]
     DECREASE_RESISTANCE = "decreaseResistance"
     CLAIM_MISSION_XP = "claimMissionXp"
     CLAIM_FINISHED_MISSION_XP = "claimFinishedMissionXp"
+
+
+# ---------------------------------------------------------------------------
+# Market & Items
+# ---------------------------------------------------------------------------
+
+
+class ItemCode(StrEnum):  # type: ignore[misc]
+    AMMO = "ammo"
+    BOOTS1 = "boots1"
+    BOOTS2 = "boots2"
+    BOOTS3 = "boots3"
+    BOOTS4 = "boots4"
+    BOOTS5 = "boots5"
+    BOOTS6 = "boots6"
+    BREAD = "bread"
+    CASE1 = "case1"
+    CASE2 = "case2"
+    CHEST1 = "chest1"
+    CHEST2 = "chest2"
+    CHEST3 = "chest3"
+    CHEST4 = "chest4"
+    CHEST5 = "chest5"
+    CHEST6 = "chest6"
+    COCA = "coca"
+    COCAIN = "cocain"
+    CONCRETE = "concrete"
+    COOKED_FISH = "cookedFish"
+    FISH = "fish"
+    GLOVES1 = "gloves1"
+    GLOVES2 = "gloves2"
+    GLOVES3 = "gloves3"
+    GLOVES4 = "gloves4"
+    GLOVES5 = "gloves5"
+    GLOVES6 = "gloves6"
+    GRAIN = "grain"
+    GUN = "gun"
+    HEAVY_AMMO = "heavyAmmo"
+    HELMET1 = "helmet1"
+    HELMET2 = "helmet2"
+    HELMET3 = "helmet3"
+    HELMET4 = "helmet4"
+    HELMET5 = "helmet5"
+    HELMET6 = "helmet6"
+    IRON = "iron"
+    JET = "jet"
+    KNIFE = "knife"
+    LEAD = "lead"
+    LIGHT_AMMO = "lightAmmo"
+    LIMESTONE = "limestone"
+    LIVESTOCK = "livestock"
+    OIL = "oil"
+    PANTS1 = "pants1"
+    PANTS2 = "pants2"
+    PANTS3 = "pants3"
+    PANTS4 = "pants4"
+    PANTS5 = "pants5"
+    PANTS6 = "pants6"
+    PAPER = "paper"
+    PETROLEUM = "petroleum"
+    RIFLE = "rifle"
+    SCRAPS = "scraps"
+    SNIPER = "sniper"
+    STEAK = "steak"
+    STEEL = "steel"
+    TANK = "tank"
+    WOOD = "wood"
+
+
+# ---------------------------------------------------------------------------
+# Sorting
+# ---------------------------------------------------------------------------
+
+
+class SortBy(StrEnum):  # type: ignore[misc]
+    BUDGET = "budget"
+    CREATED_AT = "createdAt"
+    CURRENT_PER_K = "currentPerK"
+    DURATION = "duration"
+    EXPIRES_AT = "expiresAt"
+    MINIMUM_DAMAGE = "minimumDamage"
+
+
+class SortOrder(StrEnum):  # type: ignore[misc]
+    ASC = "asc"
+    DESC = "desc"

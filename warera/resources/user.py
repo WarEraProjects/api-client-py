@@ -173,3 +173,8 @@ class UserResource(BaseResource):
                 all_users.append(None)
 
         return all_users
+
+    async def get_users_by_country(self, country_id: str) -> list[User]:
+        """Get users by country."""
+        res = await self._http.get("user.getUsersByCountry", {"countryId": country_id})
+        return [User.parse_obj(r) for r in res]

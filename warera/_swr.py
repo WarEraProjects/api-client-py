@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections import OrderedDict
 from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar, cast
+
+from .cache_backends import CacheBackend, MemoryCacheBackend
+from .telemetry import TelemetryHooks
 
 logger = logging.getLogger("warera.swr")
 
@@ -17,9 +19,13 @@ class SWRCache:
     A simple Stale-While-Revalidate (SWR) cache engine.
     """
 
-    def __init__(self) -> None:
-        # Maps key -> (data, fetch_timestamp)
-        self._cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+    def __init__(
+        self,
+        backend: CacheBackend | None = None,
+        telemetry: TelemetryHooks | None = None,
+    ) -> None:
+        self._cache = backend or MemoryCacheBackend()
+        self._telemetry = telemetry
         # Tracks keys currently being revalidated to avoid duplicate concurrent requests
         self._inflight: dict[str, asyncio.Task[Any]] = {}
 
@@ -33,12 +39,17 @@ class SWRCache:
         - If the key is in cache and fresh, return instantly.
         - If the key is in cache but stale, return instantly and fire a background task to update it.
         """
+        now = time.time()
+        cached = self._cache.get(key)
 
+        if cached is not None:
+            data, fetch_time = cached
+            is_stale = now - fetch_time > ttl_seconds
 
-        if key in self._cache:
-            data, timestamp = self._cache[key]
-            self._cache.move_to_end(key)
-            if time.time() - timestamp > ttl_seconds:
+            if self._telemetry:
+                self._telemetry.on_cache_hit(key, is_stale)
+
+            if is_stale:
                 logger.debug(
                     f"SWR Cache hit (stale) for '{key}'. Triggering background revalidation."
                 )
@@ -74,18 +85,20 @@ class SWRCache:
         """Execute the fetcher, store the result, and manage the inflight lock."""
         task: asyncio.Task[T] = asyncio.create_task(fetcher())
         self._inflight[key] = task
-        try:
-            data = await task
-            self._cache[key] = (data, time.time())
-            if len(self._cache) > 1000:
-                self._cache.popitem(last=False)
-            return data
-        finally:
+
+        def _on_done(t: asyncio.Task[T]) -> None:
             self._inflight.pop(key, None)
+            if not t.cancelled() and not t.exception():
+                self._cache.set(key, t.result(), time.time())
+                if self._cache.get_size() > 1000:
+                    self._cache.pop_oldest()
+
+        task.add_done_callback(_on_done)
+        return await task
 
     def clear(self) -> None:
-        """Clear the cache entirely."""
-        for task in list(self._inflight.values()):
+        for task in self._inflight.values():
             task.cancel()
+        """Clear the cache entirely."""
         self._cache.clear()
         self._inflight.clear()

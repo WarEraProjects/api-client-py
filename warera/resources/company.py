@@ -342,3 +342,12 @@ class CompanyResource(BaseResource):
 
         companies = await self.get_many(all_ids, concurrency=concurrency)
         return [c for c in companies if c is not None]
+
+    async def get_recommended_region_ids_by_item_code(self, item_code: str) -> list[str]:
+        """Get recommended region IDs by item code."""
+        import typing
+
+        res = await self._http.get(
+            "company.getRecommendedRegionIdsByItemCode", {"itemCode": item_code}
+        )
+        return typing.cast(list[str], res)

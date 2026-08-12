@@ -150,3 +150,10 @@ class BattleResource(BaseResource):
             concurrency=kwargs.pop("concurrency", 500),
             **kwargs,
         )
+
+    async def get_ranking(self, battle_id: str) -> dict[str, typing.Any]:
+        """Get battle ranking."""
+        import typing
+
+        res = await self._http.get("battleRanking.getRanking", {"battleId": battle_id})
+        return typing.cast(dict[str, typing.Any], res)
