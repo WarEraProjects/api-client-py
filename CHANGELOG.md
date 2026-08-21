@@ -26,6 +26,30 @@ Added the highly requested ability to cancel in-flight API requests, inspired by
 - **Header Customization:** Fixed the `user-agent` header to correctly broadcast `warera-client` across all network layers, and securely hashes the base36 `rt` retry header for rate-limit transparency.
 - **Request Priority Queue:** Internal batching has been split into priority lanes to ensure `HIGH` priority commands jump the queue.
 
+### ⚠️ Parameter Renames (Undocumented in previous PRs)
+- **`batch_size` → `max_batch_size`**: The `batch_size` argument was renamed across the board to clarify that it represents a hard-cap limit (enforced at `50` by the server).
+  - Affected: `WareraClient(max_batch_size=...)`
+  - Affected: `client.batch(max_batch_size=...)`
+  - Affected: `warera._batch.fetch_many_by_ids(max_batch_size=...)`
+
+### 🔍 New Resource Endpoints (Undocumented in previous PRs)
+Several new resource methods were wired up directly to the TRPC endpoints:
+- `client.search.search_mus(query: str)`
+- `client.search.search_users(query: str)`
+- `client.tournament.get_by_id(tournament_id: str)`
+- `client.user.get_users_by_country(country_id: str)`
+- `client.region.get_all_list()`
+- `client.government.get_by_country_id(country_id: str)`
+- `client.company.get_recommended_region_ids_by_item_code(item_code: str)`
+- `client.ranking.get_ranking(ranking_type: str, country_id: str | None)`
+- `client.battle.get_ranking(battle_id: str)`
+
+### 🏷️ New Enums & Options (Undocumented in previous PRs)
+- **New `ItemCode` enum**: A massive `StrEnum` mapping every single in-game item (e.g. `ItemCode.HEAVY_AMMO`, `ItemCode.BOOTS6`, `ItemCode.CONCRETE`, etc.) for strict typing.
+- **New `SortBy` & `SortOrder` enums**: Added to standardize market and item sorting.
+- **`ArticleType` updates**: Added `MU`, `USER`, and `COUNTRY` feed filters.
+- **`RankingType` updates**: Added `USER_SKINS_OWNED` to track the new cosmetic leaderboards.
+
 ## [0.2.2] — 2026-06-26
 
 This release patches several critical memory, concurrency, and parsing issues reported in the 3.1 Pro extended audit.
