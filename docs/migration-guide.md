@@ -4,6 +4,29 @@ Welcome to the WarEra Python Client migration guide! Find your target version be
 
 ---
 
+## Migrating to v0.2.4
+
+Version `0.2.4` introduces our new MkDocs documentation site and renames a parameter for clarity.
+
+### 1. New Documentation Site
+All API reference documentation, guides, and FAQ have been migrated from the GitHub Wiki to a dedicated MkDocs static site. You can now access the full, searchable documentation at:
+[https://wareraprojects.github.io/api-client-py/](https://wareraprojects.github.io/api-client-py/)
+
+### 2. Parameter Rename: `batch_size` -> `max_batch_size`
+To clarify that the client automatically enforces the server's hard limit of 50 procedures per batch chunk, the `batch_size` argument has been renamed to `max_batch_size`.
+
+**Before:**
+```python
+client = warera.WareraClient(batch_size=50)
+```
+
+**After:**
+```python
+client = warera.WareraClient(max_batch_size=50)
+```
+
+---
+
 ## Migrating to v0.2.2
 
 Version `0.2.2` introduces massive internal stability and memory-safety patches following a comprehensive architecture audit. The public API surface is completely backwards-compatible, but the underlying engines have changed.
@@ -60,7 +83,7 @@ The `get_many()` methods on all resources (e.g., `user.get_many()`, `company.get
 
 **Before:**
 ```python
-users = await client.user.get_many(["1", "2", "3", ...], batch_size=50)
+users = await client.user.get_many(["1", "2", "3", ...], max_batch_size=50)
 ```
 
 **After:**

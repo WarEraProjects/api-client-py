@@ -304,7 +304,7 @@ WareraClient(
     max_delay_ms: int = 5000,          # max retry delay in ms
     backoff_multiplier: float = 2.0,   # exponential backoff multiplier
     jitter: bool = True,               # add random jitter to delays
-    batch_size: int = 50,              # max procedures per batch POST chunk
+    max_batch_size: int = 50,              # max procedures per batch POST chunk
                                        # values above 50 are silently clamped
                                        # to the server's hard limit
     auto_batch_delay: float = 0.005,   # wait time in seconds to accumulate batch chunks
